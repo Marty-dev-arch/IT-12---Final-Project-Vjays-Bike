@@ -15,38 +15,66 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
-    const isAuth = sessionStorage.getItem('vjays_authenticated') === 'true';
-    if (isAuth) {
-      return {
-        id: '1',
-        name: 'Vjay',
-        phone: localStorage.getItem('vjays_phone') || '',
-        role: 'owner',
-      };
-    }
+    try {
+      const isAuth = sessionStorage.getItem('vjays_authenticated') === 'true';
+      if (isAuth) {
+        return {
+          id: '1',
+          name: 'Vjay',
+          phone: localStorage.getItem('vjays_phone') || '912 345 6789',
+          role: 'owner',
+        };
+      }
+    } catch {}
     return null;
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return sessionStorage.getItem('vjays_authenticated') === 'true';
+    try {
+      return sessionStorage.getItem('vjays_authenticated') === 'true';
+    } catch {
+      return false;
+    }
   });
 
-  const [storedPin, setStoredPin] = useState<string | null>(
-    localStorage.getItem('vjays_pin')
-  );
+  const [storedPin, setStoredPin] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('vjays_pin');
+    } catch {
+      return null;
+    }
+  });
 
   const login = useCallback((pin: string): boolean => {
-    const saved = localStorage.getItem('vjays_pin');
-    if (saved && pin === saved) {
-      setUser({
-        id: '1',
-        name: 'Vjay',
-        phone: localStorage.getItem('vjays_phone') || '',
-        role: 'owner',
-      });
-      setIsAuthenticated(true);
-      sessionStorage.setItem('vjays_authenticated', 'true');
-      return true;
+    try {
+      const saved = localStorage.getItem('vjays_pin');
+      if (saved && pin === saved) {
+        setUser({
+          id: '1',
+          name: 'Vjay',
+          phone: localStorage.getItem('vjays_phone') || '912 345 6789',
+          role: 'owner',
+        });
+        setIsAuthenticated(true);
+        sessionStorage.setItem('vjays_authenticated', 'true');
+        return true;
+      }
+      // If no PIN exists yet on this device (first time), automatically register this PIN!
+      if (!saved && pin.length === 6) {
+        localStorage.setItem('vjays_pin', pin);
+        setStoredPin(pin);
+        setUser({
+          id: '1',
+          name: 'Vjay',
+          phone: localStorage.getItem('vjays_phone') || '912 345 6789',
+          role: 'owner',
+        });
+        setIsAuthenticated(true);
+        sessionStorage.setItem('vjays_authenticated', 'true');
+        return true;
+      }
+    } catch (e) {
+      console.warn('Storage error during login:', e);
     }
     return false;
   }, []);
@@ -54,7 +82,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(() => {
     setUser(null);
     setIsAuthenticated(false);
-    sessionStorage.removeItem('vjays_authenticated');
+    try {
+      sessionStorage.removeItem('vjays_authenticated');
+    } catch {}
   }, []);
 
   const register = useCallback((phone: string): boolean => {

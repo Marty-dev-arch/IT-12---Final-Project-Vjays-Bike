@@ -18,23 +18,14 @@ import ProductsPage from './pages/products/ProductsPage';
 import StockMovementPage from './pages/operations/StockMovementPage';
 import AuditLogsPage from './pages/operations/AuditLogsPage';
 
-// Protected Route Wrapper
-const ProtectedRoute: React.FC = () => {
-  const { isAuthenticated } = useAuth();
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-  return <DashboardLayout />;
-};
-
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <InventoryProvider>
           <Routes>
-            {/* Root Route: Redirects to login */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            {/* Root Route: Redirects to dashboard (which checks auth in DashboardLayout) */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
             {/* Auth Routes */}
             <Route path="/login" element={<LoginPage />} />
@@ -43,7 +34,7 @@ function App() {
             <Route path="/reset-pin" element={<ResetPinPage />} />
 
             {/* Protected Dashboard Routes with Shared Layout */}
-            <Route element={<ProtectedRoute />}>
+            <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/products" element={<Navigate to="/products/braking-system" replace />} />
               <Route path="/products/:category" element={<ProductsPage />} />

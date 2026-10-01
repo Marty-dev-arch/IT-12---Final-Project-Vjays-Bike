@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import MobileBottomNav from './MobileBottomNav';
@@ -7,8 +7,10 @@ import SlideOver from '../ui/SlideOver';
 import FAQs from '../ui/faqs-component';
 import { NotificationAlertModal } from '../ui/NotificationAlertModal';
 import { useInventory } from '../../context/InventoryContext';
+import { useAuth } from '../../context/AuthContext';
 
 const DashboardLayout: React.FC = () => {
+  const { isAuthenticated } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -19,6 +21,10 @@ const DashboardLayout: React.FC = () => {
   useEffect(() => {
     setIsMobileOpen(false);
   }, [location.pathname]);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-brand-cream dark:bg-[#000000] text-neutral-900 dark:text-slate-100 font-poppins transition-colors duration-300">
