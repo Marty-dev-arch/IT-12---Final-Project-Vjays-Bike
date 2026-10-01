@@ -52,6 +52,9 @@ const LoginPage: React.FC = () => {
                 <span className="text-zinc-800 dark:text-[#A1A1A1] text-xs font-bold">
                   Enter your 6-digit security PIN
                 </span>
+                <span className="text-zinc-400 dark:text-[#737373] text-[11px] mt-1">
+                  Default PIN: <strong className="text-brand-orange-dark dark:text-[#FB714B]">123456</strong>
+                </span>
               </div>
               <div className="py-2">
                 <PinInput onComplete={handlePinComplete} error={error} />

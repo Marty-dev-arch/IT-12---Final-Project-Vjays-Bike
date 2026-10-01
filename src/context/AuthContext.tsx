@@ -14,14 +14,34 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [storedPin, setStoredPin] = useState<string | null>(
-    localStorage.getItem('vjays_pin')
-  );
+  const [user, setUser] = useState<User | null>(() => {
+    const isAuth = sessionStorage.getItem('vjays_authenticated') === 'true';
+    if (isAuth) {
+      return {
+        id: '1',
+        name: 'Vjay',
+        phone: localStorage.getItem('vjays_phone') || '',
+        role: 'owner',
+      };
+    }
+    return null;
+  });
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return sessionStorage.getItem('vjays_authenticated') === 'true';
+  });
+
+  const [storedPin, setStoredPin] = useState<string | null>(() => {
+    let pin = localStorage.getItem('vjays_pin');
+    if (!pin) {
+      pin = '123456';
+      localStorage.setItem('vjays_pin', pin);
+    }
+    return pin;
+  });
 
   const login = useCallback((pin: string): boolean => {
-    const saved = localStorage.getItem('vjays_pin');
+    const saved = localStorage.getItem('vjays_pin') || '123456';
     if (saved && pin === saved) {
       setUser({
         id: '1',
@@ -30,6 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: 'owner',
       });
       setIsAuthenticated(true);
+      sessionStorage.setItem('vjays_authenticated', 'true');
       return true;
     }
     return false;
@@ -38,6 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = useCallback(() => {
     setUser(null);
     setIsAuthenticated(false);
+    sessionStorage.removeItem('vjays_authenticated');
   }, []);
 
   const register = useCallback((phone: string): boolean => {
@@ -59,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: 'owner',
       });
       setIsAuthenticated(true);
+      sessionStorage.setItem('vjays_authenticated', 'true');
       return true;
     }
     return false;
