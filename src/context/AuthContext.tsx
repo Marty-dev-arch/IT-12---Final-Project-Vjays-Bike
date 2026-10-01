@@ -31,17 +31,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return sessionStorage.getItem('vjays_authenticated') === 'true';
   });
 
-  const [storedPin, setStoredPin] = useState<string | null>(() => {
-    let pin = localStorage.getItem('vjays_pin');
-    if (!pin) {
-      pin = '123456';
-      localStorage.setItem('vjays_pin', pin);
-    }
-    return pin;
-  });
+  const [storedPin, setStoredPin] = useState<string | null>(
+    localStorage.getItem('vjays_pin')
+  );
 
   const login = useCallback((pin: string): boolean => {
-    const saved = localStorage.getItem('vjays_pin') || '123456';
+    const saved = localStorage.getItem('vjays_pin');
     if (saved && pin === saved) {
       setUser({
         id: '1',
