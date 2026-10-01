@@ -634,16 +634,20 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         )
       );
 
-      // Remove logs for this deleted product from the frontend view (database retains full history)
-      setAuditLogs((prev) =>
-        prev.filter(
-          (log) =>
-            (!targetSku || (log.sku || '').trim().toLowerCase() !== targetSku) &&
-            (!targetName || (log.productName || '').trim().toLowerCase() !== targetName) &&
-            (!targetName || !log.details.toLowerCase().includes(targetName)) &&
-            (!targetSku || !log.details.toLowerCase().includes(targetSku))
-        )
-      );
+      // Preserve all audit logs permanently in the ledger and record the deletion event
+      const deletionLog: AuditLog = {
+        id: `log_${Date.now()}`,
+        action: 'Deleted Product',
+        productName: target?.name || targetName || 'Product',
+        sku: target?.sku || targetSku || targetId,
+        brand: target?.brand || '',
+        category: target?.category || '',
+        details: `Removed product "${target?.name || targetName || 'Item'}" (SKU: ${target?.sku || targetSku || targetId}) with remaining stock ${target?.quantity ?? 0}. Preserved in immutable audit ledger.`,
+        user: 'Vjay (Owner)',
+        timestamp: new Date().toLocaleString(),
+        type: 'adjustment',
+      };
+      setAuditLogs((prev) => [deletionLog, ...prev]);
 
       setSchedules((prev) =>
         prev.filter(
@@ -685,12 +689,25 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setMovements([]);
         setSchedules([]);
         setNotifications([]);
-        setAuditLogs([]);
+        // Audit logs are NEVER deleted - retained permanently
         localStorage.removeItem('vjays_products');
         localStorage.removeItem('vjays_movements');
         localStorage.removeItem('vjays_schedules');
         localStorage.removeItem('vjays_notifications');
-        localStorage.removeItem('vjays_audit_logs');
+
+        const catalogClearLog: AuditLog = {
+          id: `log_${Date.now()}`,
+          action: 'Catalog Cleared',
+          productName: 'All Products',
+          sku: 'ALL-SKUS',
+          brand: 'System',
+          category: 'All',
+          details: 'All catalog items cleared from floor display. Complete audit history preserved in verification ledger.',
+          user: 'Vjay (Owner)',
+          timestamp: new Date().toLocaleString(),
+          type: 'adjustment',
+        };
+        setAuditLogs((prev) => [catalogClearLog, ...prev]);
       } else {
         setMovements((prev) =>
           prev.filter(
@@ -714,15 +731,20 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           prev.filter((n) => !n.productId || !deletedIds.has(String(n.productId)))
         );
 
-        // Remove category products' logs from frontend view
-        setAuditLogs((prev) =>
-          prev.filter(
-            (log) =>
-              (!log.sku || !deletedSkus.has(log.sku.trim().toLowerCase())) &&
-              (!log.productName || !deletedNames.has(log.productName.trim().toLowerCase())) &&
-              (!log.category || log.category !== cat)
-          )
-        );
+        // Audit logs are NEVER deleted - add audit record for the category clearance
+        const catClearLog: AuditLog = {
+          id: `log_${Date.now()}`,
+          action: 'Category Cleared',
+          productName: `Category: ${cat}`,
+          sku: cat.toUpperCase(),
+          brand: 'System',
+          category: cat,
+          details: `Cleared products under category "${cat}". Full history retained in immutable audit ledger.`,
+          user: 'Vjay (Owner)',
+          timestamp: new Date().toLocaleString(),
+          type: 'adjustment',
+        };
+        setAuditLogs((prev) => [catClearLog, ...prev]);
       }
 
       productsApi.deleteAll(cat).catch((err) => {
@@ -1156,6 +1178,20 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const clearMovements = useCallback(() => {
     localStorage.removeItem('vjays_movements');
     setMovements([]);
+
+    const movClearLog: AuditLog = {
+      id: `log_${Date.now()}`,
+      action: 'Cleared Movement History',
+      productName: 'Stock Movement Floor Log',
+      sku: 'MOV-RESET',
+      brand: 'System',
+      category: 'Operations',
+      details: 'Floor stock-in and stock-out history cleared. Historical transaction audit logs permanently preserved.',
+      user: 'Vjay (Owner)',
+      timestamp: new Date().toLocaleString(),
+      type: 'adjustment',
+    };
+    setAuditLogs((prev) => [movClearLog, ...prev]);
   }, []);
 
   const clearAllData = useCallback(() => {
