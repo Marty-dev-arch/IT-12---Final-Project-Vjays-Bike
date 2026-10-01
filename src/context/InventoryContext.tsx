@@ -89,144 +89,18 @@ const cleanDuplicateAuditLogs = (items: AuditLog[]): AuditLog[] => {
   });
 };
 
-const DEFAULT_PRODUCTS: Product[] = [
-  {
-    id: 'prod_bolids_caliper',
-    name: 'Mechanical Disc Brake Caliper',
-    sku: 'BLD-180-01',
-    category: 'braking-system',
-    brand: 'BOLIDS',
-    price: 650,
-    costPrice: 420,
-    quantity: 12,
-    minStock: 5,
-    maxCapacity: 25,
-    location: 'Warehouse shelf a1',
-    status: 'in-stock',
-    image: '/images/products/bolids-disc-brake-caliper.jpg',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'prod_universal_pads',
-    name: 'Disc Brake Pads with Spring',
-    sku: 'PAD-DSK-01',
-    category: 'braking-system',
-    brand: 'Universal',
-    price: 180,
-    costPrice: 95,
-    quantity: 24,
-    minStock: 8,
-    maxCapacity: 50,
-    location: 'Warehouse shelf a2',
-    status: 'in-stock',
-    image: '/images/products/universal-disc-brake-pads.jpg',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'prod_shimano_chain',
-    name: 'CN-HG53 9-Speed Chain (116L)',
-    sku: 'CN-HG53-01',
-    category: 'drivetrain-chains',
-    brand: 'Shimano',
-    price: 400,
-    costPrice: 280,
-    quantity: 15,
-    minStock: 5,
-    maxCapacity: 30,
-    location: 'Warehouse shelf b1',
-    status: 'in-stock',
-    image: '/images/products/shimano-cn-hg53-chain.jpg',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'prod_bucklos_cassette',
-    name: 'Bicycle Cassette',
-    sku: 'BCK-CAS-01',
-    category: 'drivetrain-chains',
-    brand: 'BUCKLOS',
-    price: 850,
-    costPrice: 560,
-    quantity: 8,
-    minStock: 4,
-    maxCapacity: 20,
-    location: 'Warehouse shelf b2',
-    status: 'in-stock',
-    image: '/images/products/bucklos-bicycle-cassette.jpg',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'prod_meroca_pulley',
-    name: '13T CNC Jockey Wheel Pulley',
-    sku: 'MRC-13T-01',
-    category: 'drivetrain-chains',
-    brand: 'MEROCA',
-    price: 165,
-    costPrice: 90,
-    quantity: 20,
-    minStock: 6,
-    maxCapacity: 40,
-    location: 'Warehouse shelf b3',
-    status: 'in-stock',
-    image: '/images/products/meroca-13t-jockey-wheel.jpg',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'prod_ragusa_crankset',
-    name: 'R-500 1x Crankset with Chainring',
-    sku: 'RGS-R500-01',
-    category: 'drivetrain-chains',
-    brand: 'RAGUSA',
-    price: 1250,
-    costPrice: 850,
-    quantity: 12,
-    minStock: 4,
-    maxCapacity: 25,
-    location: 'Warehouse shelf b4',
-    status: 'in-stock',
-    image: '/images/products/ragusa-r500-crankset.jpg',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'prod_inspeed_handlebar',
-    name: '6061-T6 Alloy Handlebar (31.8mm)',
-    sku: 'INSP-HB-01',
-    category: 'handle-bar-handle-grip',
-    brand: 'INSPEED',
-    price: 650,
-    costPrice: 420,
-    quantity: 14,
-    minStock: 5,
-    maxCapacity: 30,
-    location: 'Warehouse shelf c1',
-    status: 'in-stock',
-    image: '/images/products/inspeed-alloy-handlebar.jpg',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'prod_purple_lockon_grips',
-    name: 'Dual Lock-On Handlebar Grips (Purple)',
-    sku: 'GRP-LCK-PRP-01',
-    category: 'handle-bar-handle-grip',
-    brand: 'Universal',
-    price: 280,
-    costPrice: 150,
-    quantity: 22,
-    minStock: 8,
-    maxCapacity: 45,
-    location: 'Warehouse shelf c2',
-    status: 'in-stock',
-    image: '/images/products/universal-purple-lock-on-grips.jpg',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+const DEMO_PRODUCT_IDS = new Set([
+  'prod_bolids_caliper',
+  'prod_universal_pads',
+  'prod_shimano_chain',
+  'prod_bucklos_cassette',
+  'prod_meroca_pulley',
+  'prod_ragusa_crankset',
+  'prod_inspeed_handlebar',
+  'prod_purple_lockon_grips',
+]);
+
+const DEFAULT_PRODUCTS: Product[] = [];
 
 const stripBrandFromPartName = (p: Product): Product => {
   let cat = p.category as string;
@@ -249,17 +123,29 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (saved !== null) {
       try {
         const parsed: Product[] = JSON.parse(saved);
-        return parsed.map(stripBrandFromPartName);
+        // Exclude legacy demo items so existing mobile & web sessions reset cleanly to 0
+        const filtered = parsed
+          .filter((p) => !DEMO_PRODUCT_IDS.has(p.id))
+          .map(stripBrandFromPartName);
+        return filtered;
       } catch {
         return [];
       }
     }
-    return DEFAULT_PRODUCTS.map(stripBrandFromPartName);
+    return [];
   });
 
   const [movements, setMovements] = useState<StockMovement[]>(() => {
     const saved = localStorage.getItem('vjays_movements');
-    return saved ? cleanDuplicateMovements(JSON.parse(saved)) : [];
+    if (!saved) return [];
+    try {
+      const parsed: StockMovement[] = JSON.parse(saved);
+      return cleanDuplicateMovements(
+        parsed.filter((m) => !DEMO_PRODUCT_IDS.has(String(m.productId)))
+      );
+    } catch {
+      return [];
+    }
   });
 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
@@ -269,12 +155,24 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [schedules, setSchedules] = useState<RestockSchedule[]>(() => {
     const saved = localStorage.getItem('vjays_schedules');
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    try {
+      const parsed: RestockSchedule[] = JSON.parse(saved);
+      return parsed.filter((s) => !DEMO_PRODUCT_IDS.has(String(s.productId)));
+    } catch {
+      return [];
+    }
   });
 
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
     const saved = localStorage.getItem('vjays_notifications');
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    try {
+      const parsed: AppNotification[] = JSON.parse(saved);
+      return parsed.filter((n) => !n.productId || !DEMO_PRODUCT_IDS.has(String(n.productId)));
+    } catch {
+      return [];
+    }
   });
 
   const [searchQuery, setSearchQuery] = useState('');
