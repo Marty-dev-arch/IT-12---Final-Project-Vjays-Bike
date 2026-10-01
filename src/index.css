@@ -1,0 +1,280 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Brand Core (Warm Cycling Heritage) */
+  --brand-orange: #E98B3A;
+  --brand-orange-dark: #924C00;
+  --brand-orange-light: #FDAD63;
+  --brand-cream: #FAFAF8;
+  --brand-border: #E8E3DD;
+  --brand-surface: #FFFFFF;
+  --brand-surface-elevated: #F8F7F4;
+  --brand-active-bg: #FFF5ED;
+  --brand-active-text: #FB714B;
+
+  /* Typography */
+  --text-primary: #171717;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+
+  /* shadcn base HSL tokens */
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 24 82% 57%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 30 20% 96%;
+  --secondary-foreground: 24 82% 35%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 30 100% 97%;
+  --accent-foreground: 24 82% 40%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 30 15% 89%;
+  --input: 30 15% 89%;
+  --ring: 24 82% 57%;
+}
+
+.dark {
+  /* Vercel Minimal Dark Palette (21st.dev @serafimcloud/themes/vercel) */
+  --brand-orange: #FB714B;
+  --brand-orange-dark: #FF9B78;
+  --brand-orange-light: #FFBFA6;
+  --brand-cream: #000000; /* Vercel pitch black canvas */
+  --brand-border: #262626; /* Vercel 15% hairline border */
+  --brand-surface: #0A0A0A; /* Vercel card & navbar surface */
+  --brand-surface-elevated: #121212; /* Vercel elevated chips / inputs / popovers */
+  --brand-active-bg: #1A120E; /* Subtle warm dark ember */
+  --brand-active-text: #FB714B;
+
+  /* Typography (Vercel contrast: crisp white titles, soft silver body) */
+  --text-primary: #EDEDED; /* Clear crisp titles */
+  --text-secondary: #A1A1A1; /* Comfortable soft zinc, non-straining */
+  --text-muted: #737373; /* Subtle indicators */
+
+  /* shadcn dark HSL tokens (Vercel theme) */
+  --background: 0 0% 0%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 4%;
+  --card-foreground: 0 0% 98%;
+  --popover: 0 0% 4%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 0 0% 98%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 12%;
+  --muted-foreground: 0 0% 63%;
+  --accent: 0 0% 12%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 0 0% 15%;
+  --input: 0 0% 15%;
+  --ring: 0 0% 80%;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--brand-cream);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d4d4;
+  border-radius: 3px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #333a48;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a3a3a3;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #475266;
+}
+
+/* Custom focus styles */
+input:focus,
+button:focus-visible {
+  outline: 2px solid var(--brand-orange);
+  outline-offset: 2px;
+}
+
+/* Transition defaults */
+button, a, input {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+}
+
+/* ==========================================================================
+   MINIMAL LIST & TABLE DESIGN SYSTEM (Flat, Clean, Minimal — Not Card)
+   Matches the minimal border layout with subtle headers and vertical dividers
+   ========================================================================== */
+
+.minimal-inventory-container {
+  width: 100%;
+  background-color: var(--brand-surface);
+  border: 1px solid var(--brand-border);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02);
+  overflow: hidden;
+}
+
+.dark .minimal-inventory-container {
+  background-color: var(--brand-surface);
+  border-color: #262626;
+}
+
+.minimal-table-header {
+  border-bottom: 1px solid var(--brand-border);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+  background-color: transparent;
+}
+
+.dark .minimal-table-header {
+  border-color: #222222;
+  color: #737373;
+}
+
+.minimal-section-heading {
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.minimal-v-divider {
+  border-left: 1px solid var(--brand-border);
+}
+
+.dark .minimal-v-divider {
+  border-left-color: #222222;
+}
+
+.minimal-row {
+  border-bottom: 1px solid var(--brand-border);
+  transition: background-color 0.15s ease;
+}
+
+.minimal-row:last-child {
+  border-bottom: none;
+}
+
+.dark .minimal-row {
+  border-bottom-color: #1c1c1c;
+}
+
+.minimal-row:hover {
+  background-color: rgba(0, 0, 0, 0.015);
+}
+
+.dark .minimal-row:hover {
+  background-color: rgba(255, 255, 255, 0.025);
+}
+
+/* ==========================================================================
+   RESPONSIVE AUTO-ADAPTATION (@media queries for mobile devices)
+   Automatically adapts text, buttons, cards, and components to smaller,
+   compact sizes on mobile screens.
+   ========================================================================== */
+
+@media screen and (max-width: 768px) {
+  /* Automatic scale-down for headings on mobile */
+  h1 {
+    font-size: 1.25rem !important;
+    line-height: 1.3 !important;
+  }
+  h2 {
+    font-size: 1.05rem !important;
+    line-height: 1.35 !important;
+  }
+  h3 {
+    font-size: 0.9rem !important;
+    line-height: 1.35 !important;
+  }
+
+  /* Automatic scale-down for action buttons */
+  .btn-adapt,
+  button.adapt-mobile {
+    font-size: 0.75rem !important;
+    padding: 0.375rem 0.65rem !important;
+    border-radius: 0.5rem !important;
+    gap: 0.35rem !important;
+  }
+
+  /* Small button icons */
+  .btn-adapt svg,
+  button.adapt-mobile svg {
+    width: 0.875rem !important;
+    height: 0.875rem !important;
+  }
+
+  /* Inputs, selects, search bars adapt to compact size */
+  input.adapt-mobile,
+  select.adapt-mobile {
+    font-size: 0.75rem !important;
+    padding: 0.4rem 0.65rem !important;
+    border-radius: 0.5rem !important;
+  }
+
+  /* Summary metric blocks compact on mobile */
+  .metric-stat-item {
+    padding: 0.625rem 0.75rem !important;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  /* Extra small mobile screens (iPhone SE, smaller viewport) */
+  h1 {
+    font-size: 1.125rem !important;
+  }
+  h2 {
+    font-size: 0.95rem !important;
+  }
+
+  .btn-adapt,
+  button.adapt-mobile {
+    font-size: 0.7rem !important;
+    padding: 0.3rem 0.5rem !important;
+  }
+
+  /* Minimal table row cell padding compact */
+  .minimal-td-compact {
+    padding-left: 0.375rem !important;
+    padding-right: 0.375rem !important;
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+}

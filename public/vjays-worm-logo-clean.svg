@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 326 116" fill="none">
+  <!-- NASA Worm style VJAYS wordmark (Continuous zero-spacing 5-letter layout) -->
+  <g stroke="#EA1D24" stroke-width="15" stroke-linecap="round" stroke-linejoin="round">
+    <!-- V -->
+    <path d="M 18 24 L 46 86 C 48 91 54 91 56 86 L 84 24" />
+    
+    <!-- J -->
+    <path d="M 120 24 L 120 64 C 120 80 110 90 95 90 C 83 90 75 82 75 72" />
+    
+    <!-- A (Iconic NASA arch without crossbar) -->
+    <path d="M 132 90 L 160 30 C 163 24 171 24 174 30 L 202 90" />
+    
+    <!-- Y -->
+    <path d="M 214 24 L 240 56 L 240 90" />
+    <path d="M 266 24 L 240 56" />
+    
+    <!-- S (Iconic NASA serpentine ribbon snug against Y) -->
+    <path d="M 306 38 C 306 27 297 24 283 24 C 267 24 260 33 260 43 C 260 54 272 59 288 63 C 302 66 310 73 310 81 C 310 88 299 90 286 90 C 272 90 262 85 262 77" />
+  </g>
+</svg>
