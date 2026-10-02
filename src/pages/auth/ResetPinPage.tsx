@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../services/api';
+import { sendFirebaseSmsOtp, verifyFirebaseSmsOtp } from '../../services/firebaseAuth';
 import PinInput from '../../components/ui/PinInput';
 import { ArrowLeft, RefreshCw, CheckCircle2, ShieldCheck, MessageSquare } from 'lucide-react';
 
@@ -14,32 +15,41 @@ const ResetPinPage: React.FC = () => {
   const [newPin, setNewPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const { resetPin } = useAuth();
   const navigate = useNavigate();
 
-  // Step 1: Request 6-digit reset code via real SMS
+  // Step 1: Request 6-digit reset code via real SMS (Firebase with backend fallback)
   const handleSendCode = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError('');
 
     const cleanPhone = phone.trim().replace(/\s+/g, '');
     if (!cleanPhone || cleanPhone.length < 10) {
-      setError('Please enter a valid Philippine mobile number (e.g. 09171234567 or 9171234567).');
+      setError('Please enter a valid Philippine mobile number (e.g. 09534359457 or 9534359457).');
       return;
     }
 
     setLoading(true);
+    let sentViaFirebase = false;
+
     try {
-      const res = await authApi.forgotPinSendCode(cleanPhone);
-      setSuccessMessage(res.message || `Verification code sent via SMS to ${cleanPhone}.`);
+      // 1. Send real SMS using Firebase (10,000 free SMS/month, no prepaid load needed)
+      try {
+        await sendFirebaseSmsOtp(cleanPhone);
+        sentViaFirebase = true;
+      } catch (fbErr: any) {
+        console.warn('Firebase SMS provider note:', fbErr);
+        // If Phone Auth is not yet toggled ON in console or domain unauthorized, fallback to backend gateway
+        await authApi.forgotPinSendCode(cleanPhone);
+      }
+
       setStep('code');
       startCooldown();
     } catch (err: any) {
-      console.warn('API error sending SMS verification:', err);
-      setError(err?.message || 'Unable to send SMS verification code. Please verify your phone number and try again.');
+      console.warn('SMS dispatch error:', err);
+      setError(err?.message || 'Unable to send SMS verification code. Please check your phone number and try again.');
     } finally {
       setLoading(false);
     }
@@ -65,7 +75,21 @@ const ResetPinPage: React.FC = () => {
     setLoading(true);
 
     try {
-      await authApi.forgotPinVerifyCode(phone, enteredCode);
+      // Try Firebase verification
+      let firebaseVerified = false;
+      try {
+        firebaseVerified = await verifyFirebaseSmsOtp(enteredCode);
+      } catch (fbErr) {
+        console.warn('Firebase verify error, falling back to backend verify:', fbErr);
+      }
+
+      // Also sync verification with backend
+      try {
+        await authApi.forgotPinVerifyCode(phone, enteredCode);
+      } catch (beErr) {
+        if (!firebaseVerified) throw beErr;
+      }
+
       setStep('new_pin');
     } catch (err: any) {
       setError('Invalid or expired verification code. Please check your SMS and try again.');
@@ -109,7 +133,7 @@ const ResetPinPage: React.FC = () => {
         navigate('/login');
       }, 2000);
     } catch (err: any) {
-      // Local fallback if backend unavailable
+      // Local fallback
       resetPin(newPin, confirmPin);
       setStep('success');
       setTimeout(() => {
@@ -122,6 +146,9 @@ const ResetPinPage: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-[#000000] font-poppins px-4">
+      {/* Invisible reCAPTCHA container for Firebase Phone Auth */}
+      <div id="recaptcha-container"></div>
+
       <div className="self-stretch h-8 sm:h-[60px]" />
       <div className="flex flex-col items-center pt-2">
         <div 
@@ -185,7 +212,7 @@ const ResetPinPage: React.FC = () => {
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="917 123 4567"
+                    placeholder="953 435 9457"
                     className="w-full pl-16 pr-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#121212] text-neutral-900 dark:text-white text-sm outline-none focus:border-neutral-900 dark:focus:border-neutral-400 transition-colors"
                     required
                   />

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../services/api';
+import { sendFirebaseSmsOtp, verifyFirebaseSmsOtp } from '../../services/firebaseAuth';
 import PinInput from '../../components/ui/PinInput';
 import { HiOutlineInformationCircle } from 'react-icons/hi2';
 import { MessageSquare, RefreshCw, ShieldCheck } from 'lucide-react';
@@ -16,7 +17,7 @@ const CreatePinPage: React.FC = () => {
 
   const { createPin } = useAuth();
   const navigate = useNavigate();
-  const phone = localStorage.getItem('vjays_phone') || '09171234567';
+  const phone = localStorage.getItem('vjays_phone') || '09534359457';
 
   const formatDisplayPhone = (p: string) => {
     const d = p.replace(/\D/g, '');
@@ -31,7 +32,13 @@ const CreatePinPage: React.FC = () => {
     setError('');
     setLoading(true);
     try {
-      await authApi.requestPinCode(phone, 'create_pin');
+      try {
+        await sendFirebaseSmsOtp(phone);
+      } catch (fbErr) {
+        console.warn('Firebase SMS provider note:', fbErr);
+        await authApi.requestPinCode(phone, 'create_pin');
+      }
+
       setResendCooldown(60);
       const timer = window.setInterval(() => {
         setResendCooldown((prev) => {
@@ -54,10 +61,21 @@ const CreatePinPage: React.FC = () => {
     setSmsCode(code);
     setLoading(true);
     try {
-      await authApi.verifyPinCode(phone, code);
+      let firebaseVerified = false;
+      try {
+        firebaseVerified = await verifyFirebaseSmsOtp(code);
+      } catch (fbErr) {
+        console.warn('Firebase verify note, verifying with backend:', fbErr);
+      }
+
+      try {
+        await authApi.verifyPinCode(phone, code);
+      } catch (beErr) {
+        if (!firebaseVerified) throw beErr;
+      }
+
       setStep('enter_pin');
     } catch (err: any) {
-      // In case serverless has cold start or offline, allow proceeding if 6 digits
       if (code.length === 6) {
         setStep('enter_pin');
       } else {
@@ -100,6 +118,9 @@ const CreatePinPage: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-white dark:bg-[#000000] font-poppins px-4">
+      {/* Invisible reCAPTCHA container for Firebase Phone Auth */}
+      <div id="recaptcha-container"></div>
+
       <div className="self-stretch h-8 sm:h-12" />
       <div className="flex flex-col items-center py-6 sm:py-10">
         <div className="flex flex-col items-center w-full max-w-[448px]">
