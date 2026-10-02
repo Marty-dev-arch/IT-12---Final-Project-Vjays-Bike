@@ -118,3 +118,81 @@ server: {
   }
 }
 ```
+
+---
+
+## 🐘 Vercel Postgres & Real-Time Dashboard Monitoring
+
+The system is fully configured to run with **Vercel Postgres (powered by Neon)** in serverless production on Vercel, allowing you to monitor and query all your data live from the Vercel Dashboard!
+
+### 1. Create your Database in Vercel
+1. Log into your [Vercel Dashboard](https://vercel.com/dashboard).
+2. Go to your **Project** -> click the **Storage** tab.
+3. Click **Create Database** -> Select **Postgres** (or **Neon**).
+4. Click **Create & Continue** and link it to your project environments (Production, Preview, Development).
+5. Vercel automatically exposes the connection environment variables (`POSTGRES_URL`, `POSTGRES_URL_NON_POOLING`, `POSTGRES_USER`, etc.).
+
+### 2. Initialize Database & Migrate Data
+Choose any of the following 3 seamless methods:
+
+#### Method A: Instant SQL in Vercel Dashboard (Zero Terminal Required)
+1. Open your Vercel Dashboard -> **Storage** -> Click your Postgres Database.
+2. Click the **Query** tab in the sidebar.
+3. Open `backend/database/vercel_postgres_init.sql` from this repository.
+4. Copy the entire SQL content and paste it into the Vercel Query editor.
+5. Click **Run Query**. All tables (`products`, `stock_movements`, `audit_logs`, `restock_schedules`, `users`, etc.) will be created with sample inventory and sequences initialized!
+
+#### Method B: One-Click Web Migration Endpoint
+Visit your deployed API endpoint in your browser or Postman:
+```
+https://<your-vercel-domain>/api/system/migrate?secret=<MIGRATE_SECRET_KEY_OR_APP_KEY>&seed=true
+```
+This triggers `Artisan::call('migrate')` directly in the serverless container and responds with JSON migration confirmation!
+
+#### Method C: Local Artisan CLI
+Pull your Vercel env or copy `POSTGRES_URL` into `backend/.env`:
+```env
+DB_CONNECTION=pgsql
+DB_URL="postgres://default:password@ep-...postgres.vercel-storage.com:5432/verceldb?sslmode=require"
+```
+Then run:
+```bash
+php artisan migrate --force
+php artisan db:seed --force
+```
+
+---
+
+## 📈 Monitoring Your Data in Real-Time in Vercel Dashboard
+
+Once connected, you can monitor your inventory, counter sales, and audit trails directly from Vercel:
+
+1. **Live Data Browser**:
+   - In Vercel -> **Storage** -> Your Database -> Click **Data** tab.
+   - Select any table (`products`, `stock_movements`, `audit_logs`, `restock_schedules`).
+   - Every time a stock intake or dispatch happens in the app, you can view the newly created records immediately in the table viewer.
+
+2. **Real-Time SQL Query Console**:
+   - In Vercel -> **Storage** -> Your Database -> Click **Query** tab.
+   - Run live analytical queries directly:
+     ```sql
+     -- Check inventory valuation & current stock levels
+     SELECT name, sku, quantity, price, (quantity * price) AS total_value 
+     FROM products 
+     ORDER BY quantity ASC;
+
+     -- View real-time audit trail of floor operations
+     SELECT action, type, details, created_at 
+     FROM audit_logs 
+     ORDER BY created_at DESC 
+     LIMIT 15;
+
+     -- Check stock movement volume
+     SELECT type, SUM(quantity) as total_units 
+     FROM stock_movements 
+     GROUP BY type;
+     ```
+
+3. **Database Health Endpoint**:
+   - Query `https://<your-vercel-domain>/api/system/db-status` at any time to verify live database connectivity and record counts.
+

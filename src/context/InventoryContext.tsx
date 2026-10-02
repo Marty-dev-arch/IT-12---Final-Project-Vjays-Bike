@@ -186,6 +186,36 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setAlertModalData(null);
   }, []);
 
+  // Load live products from backend database on mount
+  useEffect(() => {
+    productsApi.getAll()
+      .then((data: any) => {
+        if (Array.isArray(data)) {
+          const mapped: Product[] = data.map((item: any) => ({
+            id: String(item.id),
+            name: item.name,
+            sku: item.sku,
+            category: item.category,
+            brand: item.brand,
+            price: Number(item.price),
+            costPrice: Number(item.cost_price ?? item.price),
+            quantity: Number(item.quantity),
+            minStock: Number(item.min_stock ?? 5),
+            maxCapacity: Number(item.max_capacity ?? item.quantity),
+            location: item.location || 'Warehouse A',
+            status: item.status,
+            image: item.image,
+            createdAt: item.created_at,
+            updatedAt: item.updated_at,
+          }));
+          setProducts(mapped);
+        }
+      })
+      .catch((err) => {
+        console.warn('Backend API offline or unreachable, using local storage:', err);
+      });
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('vjays_products', JSON.stringify(products));
   }, [products]);

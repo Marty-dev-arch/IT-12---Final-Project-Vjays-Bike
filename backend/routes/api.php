@@ -55,3 +55,69 @@ Route::prefix('dashboard')->group(function () {
 
 // Audit Logs Ledger Routes
 Route::get('/audit-logs', [AuditLogController::class, 'index']);
+
+// System & Database Operations (for Vercel Serverless & Postgres Health)
+Route::get('/system/db-status', function () {
+    try {
+        $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
+        $productsCount = \App\Models\Product::count();
+        $auditLogsCount = \App\Models\AuditLog::count();
+        $movementsCount = \App\Models\StockMovement::count();
+
+        return response()->json([
+            'status' => 'connected',
+            'driver' => $driver,
+            'counts' => [
+                'products' => $productsCount,
+                'audit_logs' => $auditLogsCount,
+                'stock_movements' => $movementsCount,
+            ],
+            'timestamp' => now()->toIso8601String(),
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage(),
+        ], 500);
+    }
+});
+
+Route::match(['get', 'post'], '/system/migrate', function (\Illuminate\Http\Request $request) {
+    $configuredSecret = env('MIGRATE_SECRET_KEY', env('APP_KEY'));
+    $providedSecret = $request->query('secret') ?: $request->header('X-Migrate-Secret');
+
+    if (!$configuredSecret || $providedSecret !== $configuredSecret) {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Unauthorized. Provide valid ?secret= matching MIGRATE_SECRET_KEY or APP_KEY in Vercel environment variables.',
+        ], 401);
+    }
+
+    try {
+        $seed = $request->boolean('seed', false);
+
+        \Illuminate\Support\Facades\Artisan::call('migrate', [
+            '--force' => true,
+        ]);
+        $output = \Illuminate\Support\Facades\Artisan::output();
+
+        if ($seed) {
+            \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                '--force' => true,
+            ]);
+            $output .= "\n" . \Illuminate\Support\Facades\Artisan::output();
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'database_driver' => \Illuminate\Support\Facades\DB::connection()->getDriverName(),
+            'output' => $output,
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage(),
+        ], 500);
+    }
+});
+
