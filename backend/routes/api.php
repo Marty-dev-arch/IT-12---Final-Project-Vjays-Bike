@@ -14,6 +14,16 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
+// Status route for /api and /api/
+Route::get('/', function () {
+    return response()->json([
+        'app' => "Vjay's Bike Parts & Accessories API",
+        'status' => 'online',
+        'database' => \Illuminate\Support\Facades\DB::connection()->getDriverName(),
+        'version' => '1.0.0',
+    ]);
+});
+
 // Authentication Routes
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);

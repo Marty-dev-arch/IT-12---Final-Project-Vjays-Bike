@@ -40,6 +40,32 @@ if (!getenv('APP_KEY') && empty($_ENV['APP_KEY'])) {
     $_SERVER['APP_KEY'] = $fallbackKey;
 }
 
+// Fallback Neon DB connection if not passed in Vercel environment
+if (!getenv('DATABASE_URL') && !getenv('POSTGRES_URL') && !getenv('DB_HOST')) {
+    $neonUrl = 'postgresql://neondb_owner:npg_W4Y5jsolOTuz@ep-bitter-firefly-b3tc6ff8.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
+    putenv("DATABASE_URL={$neonUrl}");
+    putenv("DATABASE_URL_UNPOOLED={$neonUrl}");
+    putenv("POSTGRES_URL={$neonUrl}");
+    putenv("DB_CONNECTION=pgsql");
+    $_ENV['DATABASE_URL'] = $neonUrl;
+    $_ENV['DATABASE_URL_UNPOOLED'] = $neonUrl;
+    $_ENV['POSTGRES_URL'] = $neonUrl;
+    $_ENV['DB_CONNECTION'] = 'pgsql';
+    $_SERVER['DATABASE_URL'] = $neonUrl;
+    $_SERVER['DATABASE_URL_UNPOOLED'] = $neonUrl;
+    $_SERVER['POSTGRES_URL'] = $neonUrl;
+    $_SERVER['DB_CONNECTION'] = 'pgsql';
+}
+
+// Normalize SCRIPT_NAME and PHP_SELF so Symfony Request does not treat /api as the basePath
+$_SERVER['SCRIPT_NAME'] = '/index.php';
+$_SERVER['PHP_SELF'] = '/index.php';
+
+// Also ensure REQUEST_URI starts with /api if it was stripped
+if (isset($_SERVER['REQUEST_URI']) && !str_starts_with($_SERVER['REQUEST_URI'], '/api')) {
+    $_SERVER['REQUEST_URI'] = '/api' . (str_starts_with($_SERVER['REQUEST_URI'], '/') ? '' : '/') . $_SERVER['REQUEST_URI'];
+}
+
 // Autoload composer dependencies from root or backend/
 if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require __DIR__ . '/../vendor/autoload.php';
