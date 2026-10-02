@@ -20,8 +20,14 @@ foreach ([
     }
 }
 
-// Autoload composer dependencies from backend/
-require __DIR__ . '/../backend/vendor/autoload.php';
+// Autoload composer dependencies from root or backend/
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require __DIR__ . '/../vendor/autoload.php';
+} elseif (file_exists(__DIR__ . '/../backend/vendor/autoload.php')) {
+    require __DIR__ . '/../backend/vendor/autoload.php';
+} else {
+    throw new RuntimeException("Composer dependencies not found. Please ensure composer install has been executed.");
+}
 
 // Bootstrap Laravel
 /** @var \Illuminate\Foundation\Application $app */
