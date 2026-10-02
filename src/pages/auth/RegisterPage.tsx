@@ -22,13 +22,7 @@ const RegisterPage: React.FC = () => {
 
     setLoading(true);
     try {
-      // Register local and dispatch verification PIN via SMS
       register(cleanPhone);
-      await authApi.requestPinCode(cleanPhone, 'create_pin');
-      navigate('/create-pin');
-    } catch (err: any) {
-      // Even if offline, allow continuing to PIN creation with local notice
-      console.warn('SMS dispatch notice:', err);
       navigate('/create-pin');
     } finally {
       setLoading(false);
@@ -56,7 +50,7 @@ const RegisterPage: React.FC = () => {
               Register Phone Number
             </h1>
             <p className="text-zinc-500 dark:text-[#A1A1A1] text-sm leading-relaxed">
-              Enter your store mobile number to receive a secure SMS verification code to create your PIN.
+              Enter your store mobile number to register and set up your security PIN.
             </p>
           </div>
 
