@@ -29,24 +29,28 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 
 // Auth endpoints
 export const authApi = {
-  login: (pin: string) => request('/auth/login', {
+  login: (pin: string, phone?: string) => request<{ message: string; token: string; user: any }>('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ pin }),
+    body: JSON.stringify({ pin, phone }),
   }),
-  register: (phone: string) => request('/auth/register', {
+  loginWithCode: (phone: string, code: string) => request<{ message: string; token: string; user: any }>('/auth/login-with-code', {
     method: 'POST',
-    body: JSON.stringify({ phone }),
+    body: JSON.stringify({ phone, code }),
   }),
-  createPin: (pin: string) => request('/auth/create-pin', {
+  register: (phone: string, name?: string) => request<{ message: string; user: any }>('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ pin }),
+    body: JSON.stringify({ phone, name }),
   }),
-  resetPin: (newPin: string, confirmPin: string, phone?: string, code?: string) => request('/auth/reset-pin', {
+  createPin: (pin: string, phone?: string, code?: string) => request<{ message: string; token: string; user: any }>('/auth/create-pin', {
+    method: 'POST',
+    body: JSON.stringify({ pin, phone, code }),
+  }),
+  resetPin: (newPin: string, confirmPin: string, phone?: string, code?: string) => request<{ success: boolean; message: string }>('/auth/reset-pin', {
     method: 'POST',
     body: JSON.stringify({ new_pin: newPin, confirm_pin: confirmPin, phone, code }),
   }),
-  // Forgot PIN Phone Verification OTP flow
-  forgotPinSendCode: (phone: string) => request<{ success: boolean; message: string; phone: string; code?: string; expires_in?: number }>('/auth/forgot-pin/send-code', {
+  // PIN Verification & SMS Security Flow
+  forgotPinSendCode: (phone: string) => request<{ success: boolean; message: string; phone: string; channel?: string; expires_in?: number }>('/auth/forgot-pin/send-code', {
     method: 'POST',
     body: JSON.stringify({ phone }),
   }),
@@ -57,6 +61,14 @@ export const authApi = {
   forgotPinReset: (data: { phone: string; code: string; new_pin: string; confirm_pin: string }) => request<{ success: boolean; message: string; user?: any }>('/auth/forgot-pin/reset-pin', {
     method: 'POST',
     body: JSON.stringify(data),
+  }),
+  requestPinCode: (phone: string, purpose: 'create_pin' | 'login' | 'reset' = 'create_pin') => request<{ success: boolean; message: string; phone: string; channel?: string; expires_in?: number }>('/auth/request-pin-code', {
+    method: 'POST',
+    body: JSON.stringify({ phone, purpose }),
+  }),
+  verifyPinCode: (phone: string, code: string) => request<{ success: boolean; message: string }>('/auth/verify-pin-code', {
+    method: 'POST',
+    body: JSON.stringify({ phone, code }),
   }),
 };
 

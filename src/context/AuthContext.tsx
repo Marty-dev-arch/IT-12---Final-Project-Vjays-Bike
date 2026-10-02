@@ -5,10 +5,11 @@ import { authApi } from '../services/api';
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (pin: string) => boolean;
+  login: (pin: string, phone?: string) => boolean;
+  loginWithSms: (phone: string, code: string) => Promise<boolean>;
   logout: () => void;
   register: (phone: string) => boolean;
-  createPin: (pin: string) => boolean;
+  createPin: (pin: string, code?: string) => Promise<boolean> | boolean;
   resetPin: (newPin: string, confirmPin: string) => boolean;
 }
 
@@ -46,19 +47,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  const login = useCallback((pin: string): boolean => {
+  const login = useCallback((pin: string, phone?: string): boolean => {
     try {
       const saved = localStorage.getItem('vjays_pin');
       if (saved && pin === saved) {
         setUser({
           id: '1',
           name: 'Vjay',
-          phone: localStorage.getItem('vjays_phone') || '912 345 6789',
+          phone: phone || localStorage.getItem('vjays_phone') || '912 345 6789',
           role: 'owner',
         });
         setIsAuthenticated(true);
         sessionStorage.setItem('vjays_authenticated', 'true');
-        authApi.login(pin).catch(() => {});
+        authApi.login(pin, phone).catch(() => {});
         return true;
       }
       // If no PIN exists yet on this device (first time), automatically register this PIN!
@@ -68,16 +69,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser({
           id: '1',
           name: 'Vjay',
-          phone: localStorage.getItem('vjays_phone') || '912 345 6789',
+          phone: phone || localStorage.getItem('vjays_phone') || '912 345 6789',
           role: 'owner',
         });
         setIsAuthenticated(true);
         sessionStorage.setItem('vjays_authenticated', 'true');
-        authApi.createPin(pin).catch(() => {});
+        authApi.createPin(pin, phone).catch(() => {});
         return true;
       }
     } catch (e) {
       console.warn('Storage error during login:', e);
+    }
+    return false;
+  }, []);
+
+  const loginWithSms = useCallback(async (phone: string, code: string): Promise<boolean> => {
+    try {
+      const res = await authApi.loginWithCode(phone, code);
+      if (res && res.user) {
+        setUser({
+          id: String(res.user.id || '1'),
+          name: res.user.name || 'Vjay',
+          phone: res.user.phone || phone,
+          role: res.user.role || 'owner',
+        });
+        setIsAuthenticated(true);
+        sessionStorage.setItem('vjays_authenticated', 'true');
+        localStorage.setItem('vjays_phone', phone);
+        return true;
+      }
+    } catch (err) {
+      console.warn('API error during SMS login, checking local fallback:', err);
     }
     return false;
   }, []);
@@ -99,19 +121,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   }, []);
 
-  const createPin = useCallback((pin: string): boolean => {
+  const createPin = useCallback((pin: string, code?: string): boolean => {
     if (pin.length === 6 && !/^(012345|123456|234567|345678|456789|567890)$/.test(pin)) {
       localStorage.setItem('vjays_pin', pin);
       setStoredPin(pin);
+      const phone = localStorage.getItem('vjays_phone') || '';
       setUser({
         id: '1',
         name: 'Vjay',
-        phone: localStorage.getItem('vjays_phone') || '',
+        phone: phone,
         role: 'owner',
       });
       setIsAuthenticated(true);
       sessionStorage.setItem('vjays_authenticated', 'true');
-      authApi.createPin(pin).catch(() => {});
+      authApi.createPin(pin, phone, code).catch(() => {});
       return true;
     }
     return false;
@@ -129,7 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, login, logout, register, createPin, resetPin }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, login, loginWithSms, logout, register, createPin, resetPin }}>
       {children}
     </AuthContext.Provider>
   );

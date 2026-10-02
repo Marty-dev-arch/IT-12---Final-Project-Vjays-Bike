@@ -1,6 +1,5 @@
--- =========================================================================
+
 -- Vjay's Bike Parts & Accessories - Vercel PostgreSQL Production Schema & Data
--- Generated: 2026-10-02 00:30:38
 -- Compatible with: Vercel Postgres / Neon PostgreSQL (v14+ / v15+ / v16+)
 -- =========================================================================
 
@@ -106,11 +105,21 @@ CREATE TABLE IF NOT EXISTS pin_reset_codes (
     id BIGSERIAL PRIMARY KEY,
     phone VARCHAR(255) NOT NULL,
     code VARCHAR(6) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'sent',
+    channel VARCHAR(50) NOT NULL DEFAULT 'sms',
+    message TEXT NULL,
+    gateway_response TEXT NULL,
     expires_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
     verified_at TIMESTAMP(0) WITHOUT TIME ZONE NULL,
     created_at TIMESTAMP(0) WITHOUT TIME ZONE NULL,
     updated_at TIMESTAMP(0) WITHOUT TIME ZONE NULL
 );
+
+-- Ensure columns exist if table was already created in Postgres/Neon
+ALTER TABLE pin_reset_codes ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'sent';
+ALTER TABLE pin_reset_codes ADD COLUMN IF NOT EXISTS channel VARCHAR(50) DEFAULT 'sms';
+ALTER TABLE pin_reset_codes ADD COLUMN IF NOT EXISTS message TEXT NULL;
+ALTER TABLE pin_reset_codes ADD COLUMN IF NOT EXISTS gateway_response TEXT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_pin_reset_phone ON pin_reset_codes(phone);
 
@@ -208,22 +217,7 @@ INSERT INTO "migrations" ("id", "migration", "batch") VALUES (8, '2026_09_30_224
 
 SELECT setval('migrations_id_seq', COALESCE((SELECT MAX(id) FROM "migrations"), 1));
 
--- -----------------------------------------------------
--- Catalog Seed: Ensure standard bike parts catalog exists
--- -----------------------------------------------------
-INSERT INTO products (name, sku, category, brand, price, cost_price, quantity, min_stock, max_capacity, location, status, image, created_at, updated_at)
-VALUES
-('Mechanical Disc Brake Caliper', 'BLD-180-01', 'braking-system', 'BOLIDS', 650.00, 420.00, 12, 5, 25, 'Warehouse shelf a1', 'in-stock', '/images/products/bolids-disc-brake-caliper.jpg', NOW(), NOW()),
-('Disc Brake Pads with Spring', 'PAD-DSK-01', 'braking-system', 'Universal', 180.00, 95.00, 24, 8, 50, 'Warehouse shelf a2', 'in-stock', '/images/products/universal-disc-brake-pads.jpg', NOW(), NOW()),
-('CN-HG53 9-Speed Chain (116L)', 'CN-HG53-01', 'drivetrain-chains', 'Shimano', 400.00, 280.00, 15, 5, 30, 'Warehouse shelf b1', 'in-stock', '/images/products/shimano-cn-hg53-chain.jpg', NOW(), NOW()),
-('Bicycle Cassette', 'BCK-CAS-01', 'drivetrain-chains', 'BUCKLOS', 850.00, 560.00, 8, 4, 20, 'Warehouse shelf b2', 'in-stock', '/images/products/bucklos-bicycle-cassette.jpg', NOW(), NOW()),
-('13T CNC Jockey Wheel Pulley', 'MRC-13T-01', 'drivetrain-chains', 'MEROCA', 165.00, 90.00, 20, 6, 40, 'Warehouse shelf b3', 'in-stock', '/images/products/meroca-13t-jockey-wheel.jpg', NOW(), NOW()),
-('R-500 1x Crankset with Chainring', 'RGS-R500-01', 'drivetrain-chains', 'RAGUSA', 1250.00, 850.00, 12, 4, 25, 'Warehouse shelf b4', 'in-stock', '/images/products/ragusa-r500-crankset.jpg', NOW(), NOW()),
-('6061-T6 Alloy Handlebar (31.8mm)', 'INSP-HB-01', 'handle-bar-handle-grip', 'INSPEED', 650.00, 420.00, 14, 5, 30, 'Warehouse shelf c1', 'in-stock', '/images/products/inspeed-alloy-handlebar.jpg', NOW(), NOW()),
-('Dual Lock-On Handlebar Grips (Purple)', 'GRP-LCK-PRP-01', 'handle-bar-handle-grip', 'Universal', 280.00, 150.00, 22, 8, 45, 'Warehouse shelf c2', 'in-stock', '/images/products/universal-purple-lock-on-grips.jpg', NOW(), NOW())
-ON CONFLICT (sku) DO NOTHING;
 
-SELECT setval('products_id_seq', COALESCE((SELECT MAX(id) FROM products), 1));
 
 INSERT INTO migrations (migration, batch) VALUES ('2024_01_01_000001_create_users_table', 1) ON CONFLICT DO NOTHING;
 INSERT INTO migrations (migration, batch) VALUES ('2024_01_01_000002_create_products_table', 1) ON CONFLICT DO NOTHING;

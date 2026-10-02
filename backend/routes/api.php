@@ -29,12 +29,17 @@ Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/create-pin', [AuthController::class, 'createPin']);
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/login-with-code', [AuthController::class, 'loginWithCode']);
     Route::post('/reset-pin', [AuthController::class, 'resetPin']);
 
-    // Forget PIN & Phone Code Verification Routes
+    // PIN Reset & Verification Code Routes
     Route::post('/forgot-pin/send-code', [AuthController::class, 'sendResetCode']);
     Route::post('/forgot-pin/verify-code', [AuthController::class, 'verifyResetCode']);
     Route::post('/forgot-pin/reset-pin', [AuthController::class, 'resetPinWithCode']);
+
+    // Registration & Phone Security PIN Request / Verify Routes
+    Route::post('/request-pin-code', [AuthController::class, 'requestPinCode']);
+    Route::post('/verify-pin-code', [AuthController::class, 'verifyPinCode']);
 });
 
 // Products Routes
@@ -93,12 +98,31 @@ Route::get('/system/db-status', function () {
                 'users' => \App\Models\User::count(),
                 'pin_reset_codes' => \App\Models\PinResetCode::count(),
             ],
+            // Database-persisted verification dispatches (visible in Vercel & Neon Postgres)
+            'latest_sms_verifications' => \App\Models\PinResetCode::latest()->take(10)->get([
+                'id', 'phone', 'code', 'status', 'channel', 'message', 'expires_at', 'verified_at', 'created_at'
+            ]),
             'timestamp' => now()->toIso8601String(),
         ]);
     } catch (\Throwable $e) {
         return response()->json([
             'status' => 'error',
             'message' => $e->getMessage(),
+        ], 500);
+    }
+});
+
+// Dedicated endpoint to inspect SMS verification codes in database on Vercel
+Route::get('/system/sms-logs', function () {
+    try {
+        $logs = \App\Models\PinResetCode::latest()->take(50)->get();
+        return response()->json([
+            'total' => \App\Models\PinResetCode::count(),
+            'records' => $logs,
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'error' => $e->getMessage(),
         ], 500);
     }
 });

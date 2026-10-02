@@ -57,6 +57,20 @@ if (!getenv('DATABASE_URL') && !getenv('POSTGRES_URL') && !getenv('DB_HOST')) {
     $_SERVER['DB_CONNECTION'] = 'pgsql';
 }
 
+// Fallback SMS API Configuration for Vercel Serverless
+if (!getenv('SMS_API_KEY') && empty($_ENV['SMS_API_KEY'])) {
+    $smsApiKey = 'sk-2b10fnwt82j2gdxghqora8ukknzfczpo';
+    putenv("SMS_API_KEY={$smsApiKey}");
+    $_ENV['SMS_API_KEY'] = $smsApiKey;
+    $_SERVER['SMS_API_KEY'] = $smsApiKey;
+}
+if (!getenv('SMS_API_URL') && empty($_ENV['SMS_API_URL'])) {
+    $smsApiUrl = 'https://smsapiph.onrender.com/api/v1/send/sms';
+    putenv("SMS_API_URL={$smsApiUrl}");
+    $_ENV['SMS_API_URL'] = $smsApiUrl;
+    $_SERVER['SMS_API_URL'] = $smsApiUrl;
+}
+
 // Normalize SCRIPT_NAME and PHP_SELF so Symfony Request does not treat /api as the basePath
 $_SERVER['SCRIPT_NAME'] = '/index.php';
 $_SERVER['PHP_SELF'] = '/index.php';

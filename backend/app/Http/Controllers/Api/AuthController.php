@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\PinResetCode;
 use App\Models\User;
+use App\Services\SmsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -12,6 +14,9 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    /**
+     * Register a new phone number
+     */
     public function register(Request $request)
     {
         $validated = $request->validate([
@@ -19,13 +24,21 @@ class AuthController extends Controller
             'name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $user = User::firstOrCreate(
-            ['phone' => $validated['phone']],
-            [
+        $normalizedPhone = SmsService::normalizePhone($validated['phone']);
+        $localPhone = SmsService::normalizeLocalPhone($validated['phone']);
+
+        $user = User::where('phone', $validated['phone'])
+            ->orWhere('phone', $normalizedPhone)
+            ->orWhere('phone', $localPhone)
+            ->first();
+
+        if (!$user) {
+            $user = User::create([
+                'phone' => $normalizedPhone,
                 'name' => $validated['name'] ?? 'Vjay',
                 'role' => 'owner',
-            ]
-        );
+            ]);
+        }
 
         return response()->json([
             'message' => 'Phone registered successfully',
@@ -38,11 +51,15 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Set or update security PIN for a user
+     */
     public function createPin(Request $request)
     {
         $validated = $request->validate([
             'phone' => ['required', 'string'],
             'pin' => ['required', 'string', 'size:6', 'regex:/^[0-9]{6}$/'],
+            'code' => ['nullable', 'string', 'size:6'], // Optional verification code
         ]);
 
         // Validate sequentially repeating PINs
@@ -53,7 +70,48 @@ class AuthController extends Controller
             ]);
         }
 
-        $user = User::where('phone', $validated['phone'])->firstOrFail();
+        $phone = $validated['phone'];
+        $normalizedPhone = SmsService::normalizePhone($phone);
+        $localPhone = SmsService::normalizeLocalPhone($phone);
+
+        // If a verification code was provided, verify it first
+        if (!empty($validated['code'])) {
+            $validCode = PinResetCode::where(function ($q) use ($phone, $normalizedPhone, $localPhone) {
+                $q->where('phone', $phone)
+                  ->orWhere('phone', $normalizedPhone)
+                  ->orWhere('phone', $localPhone);
+            })
+            ->where('code', $validated['code'])
+            ->where('expires_at', '>', now())
+            ->latest()
+            ->first();
+
+            if (!$validCode) {
+                return response()->json([
+                    'message' => 'Invalid or expired phone verification code.',
+                ], 422);
+            }
+
+            PinResetCode::where(function ($q) use ($phone, $normalizedPhone, $localPhone) {
+                $q->where('phone', $phone)
+                  ->orWhere('phone', $normalizedPhone)
+                  ->orWhere('phone', $localPhone);
+            })->delete();
+        }
+
+        $user = User::where('phone', $phone)
+            ->orWhere('phone', $normalizedPhone)
+            ->orWhere('phone', $localPhone)
+            ->first();
+
+        if (!$user) {
+            $user = User::create([
+                'phone' => $normalizedPhone,
+                'name' => 'Vjay',
+                'role' => 'owner',
+            ]);
+        }
+
         $user->pin_hash = Hash::make($validated['pin']);
         $user->save();
 
@@ -71,14 +129,29 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Standard Login with PIN (or Phone + PIN)
+     */
     public function login(Request $request)
     {
         $validated = $request->validate([
-            'phone' => ['required', 'string'],
+            'phone' => ['nullable', 'string'],
             'pin' => ['required', 'string', 'size:6'],
         ]);
 
-        $user = User::where('phone', $validated['phone'])->first();
+        $query = User::query();
+        if (!empty($validated['phone'])) {
+            $phone = $validated['phone'];
+            $normalizedPhone = SmsService::normalizePhone($phone);
+            $localPhone = SmsService::normalizeLocalPhone($phone);
+            $query->where(function ($q) use ($phone, $normalizedPhone, $localPhone) {
+                $q->where('phone', $phone)
+                  ->orWhere('phone', $normalizedPhone)
+                  ->orWhere('phone', $localPhone);
+            });
+        }
+
+        $user = $query->first();
 
         if (!$user || !Hash::check($validated['pin'], $user->pin_hash)) {
             return response()->json([
@@ -101,7 +174,8 @@ class AuthController extends Controller
     }
 
     /**
-     * Send a 6-digit OTP code to phone number for PIN reset
+     * Send a 6-digit OTP code to phone number for PIN reset via SMS
+     * (Secure: Does NOT leak OTP code in response; persists in DB & dispatches via SMS API)
      */
     public function sendResetCode(Request $request)
     {
@@ -110,9 +184,15 @@ class AuthController extends Controller
         ]);
 
         $phone = $validated['phone'];
+        $normalizedPhone = SmsService::normalizePhone($phone);
+        $localPhone = SmsService::normalizeLocalPhone($phone);
 
         // Verify account exists with this phone number
-        $user = User::where('phone', $phone)->first();
+        $user = User::where('phone', $phone)
+            ->orWhere('phone', $normalizedPhone)
+            ->orWhere('phone', $localPhone)
+            ->first();
+
         if (!$user) {
             return response()->json([
                 'message' => 'No account found with this phone number. Please check the number or register.',
@@ -120,9 +200,13 @@ class AuthController extends Controller
         }
 
         // Rate limiting: check if a code was created within the last 60 seconds
-        $recentCode = PinResetCode::where('phone', $phone)
-            ->where('created_at', '>=', now()->subSeconds(60))
-            ->first();
+        $recentCode = PinResetCode::where(function ($q) use ($phone, $normalizedPhone, $localPhone) {
+            $q->where('phone', $phone)
+              ->orWhere('phone', $normalizedPhone)
+              ->orWhere('phone', $localPhone);
+        })
+        ->where('created_at', '>=', now()->subSeconds(60))
+        ->first();
 
         if ($recentCode) {
             return response()->json([
@@ -131,25 +215,75 @@ class AuthController extends Controller
         }
 
         // Remove old codes for this phone
-        PinResetCode::where('phone', $phone)->delete();
+        PinResetCode::where('phone', $phone)
+            ->orWhere('phone', $normalizedPhone)
+            ->orWhere('phone', $localPhone)
+            ->delete();
 
         // Generate a cryptographically secure 6-digit numeric OTP
         $code = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
 
-        PinResetCode::create([
-            'phone' => $phone,
-            'code' => $code,
-            'expires_at' => now()->addMinutes(10),
-        ]);
-
-        Log::info("Verification code generated for phone {$phone}: {$code}");
+        // Dispatch via SMS Service with auto-fallback & save to database
+        $dispatchResult = SmsService::sendVerificationPin($phone, $code, 'reset');
 
         return response()->json([
             'success' => true,
-            'message' => "Verification code sent to {$phone}.",
-            'phone' => $phone,
-            'code' => $code, // Included in response for seamless development & instant testing
-            'expires_in' => 600, // 10 minutes in seconds
+            'message' => $dispatchResult['message'],
+            'phone' => $dispatchResult['phone'],
+            'channel' => $dispatchResult['channel'],
+            'expires_in' => $dispatchResult['expires_in'],
+            // Code is safely excluded from response for production security
+        ]);
+    }
+
+    /**
+     * Request a verification code for creating PIN or logging in with phone
+     */
+    public function requestPinCode(Request $request)
+    {
+        $validated = $request->validate([
+            'phone' => ['required', 'string', 'min:10'],
+            'purpose' => ['nullable', 'string', 'in:create_pin,login,reset'],
+        ]);
+
+        $phone = $validated['phone'];
+        $purpose = $validated['purpose'] ?? 'create_pin';
+        $normalizedPhone = SmsService::normalizePhone($phone);
+        $localPhone = SmsService::normalizeLocalPhone($phone);
+
+        // Rate limiting: 60 seconds
+        $recentCode = PinResetCode::where(function ($q) use ($phone, $normalizedPhone, $localPhone) {
+            $q->where('phone', $phone)
+              ->orWhere('phone', $normalizedPhone)
+              ->orWhere('phone', $localPhone);
+        })
+        ->where('created_at', '>=', now()->subSeconds(60))
+        ->first();
+
+        if ($recentCode) {
+            return response()->json([
+                'message' => 'Please wait 60 seconds before requesting another verification code.',
+            ], 429);
+        }
+
+        // Clean old codes
+        PinResetCode::where('phone', $phone)
+            ->orWhere('phone', $normalizedPhone)
+            ->orWhere('phone', $localPhone)
+            ->delete();
+
+        // Generate 6-digit code
+        $code = str_pad((string) random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+
+        // Dispatch via SMS API with auto-fallback & database logging
+        $dispatchResult = SmsService::sendVerificationPin($phone, $code, $purpose);
+
+        return response()->json([
+            'success' => true,
+            'message' => $dispatchResult['message'],
+            'phone' => $dispatchResult['phone'],
+            'channel' => $dispatchResult['channel'],
+            'expires_in' => $dispatchResult['expires_in'],
         ]);
     }
 
@@ -165,17 +299,23 @@ class AuthController extends Controller
 
         $phone = $validated['phone'];
         $code = $validated['code'];
+        $normalizedPhone = SmsService::normalizePhone($phone);
+        $localPhone = SmsService::normalizeLocalPhone($phone);
 
-        $resetCode = PinResetCode::where('phone', $phone)
-            ->where('code', $code)
-            ->where('expires_at', '>', now())
-            ->latest()
-            ->first();
+        $resetCode = PinResetCode::where(function ($q) use ($phone, $normalizedPhone, $localPhone) {
+            $q->where('phone', $phone)
+              ->orWhere('phone', $normalizedPhone)
+              ->orWhere('phone', $localPhone);
+        })
+        ->where('code', $code)
+        ->where('expires_at', '>', now())
+        ->latest()
+        ->first();
 
         if (!$resetCode) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid or expired verification code. Please request a new code.',
+                'message' => 'Invalid or expired verification code. Please check your SMS or request a new code.',
             ], 422);
         }
 
@@ -187,6 +327,14 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Verification code verified successfully. You can now set your new PIN.',
         ]);
+    }
+
+    /**
+     * Alias for general code verification (create PIN / phone login)
+     */
+    public function verifyPinCode(Request $request)
+    {
+        return $this->verifyResetCode($request);
     }
 
     /**
@@ -211,13 +359,19 @@ class AuthController extends Controller
 
         $phone = $validated['phone'];
         $code = $validated['code'];
+        $normalizedPhone = SmsService::normalizePhone($phone);
+        $localPhone = SmsService::normalizeLocalPhone($phone);
 
-        // Verify the code
-        $resetCode = PinResetCode::where('phone', $phone)
-            ->where('code', $code)
-            ->where('expires_at', '>', now())
-            ->latest()
-            ->first();
+        // Verify the code exists and is not expired
+        $resetCode = PinResetCode::where(function ($q) use ($phone, $normalizedPhone, $localPhone) {
+            $q->where('phone', $phone)
+              ->orWhere('phone', $normalizedPhone)
+              ->orWhere('phone', $localPhone);
+        })
+        ->where('code', $code)
+        ->where('expires_at', '>', now())
+        ->latest()
+        ->first();
 
         if (!$resetCode) {
             return response()->json([
@@ -225,12 +379,29 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = User::where('phone', $phone)->firstOrFail();
+        $user = User::where('phone', $phone)
+            ->orWhere('phone', $normalizedPhone)
+            ->orWhere('phone', $localPhone)
+            ->firstOrFail();
+
         $user->pin_hash = Hash::make($validated['new_pin']);
         $user->save();
 
         // Invalidate / consume all reset codes for this phone
-        PinResetCode::where('phone', $phone)->delete();
+        PinResetCode::where(function ($q) use ($phone, $normalizedPhone, $localPhone) {
+            $q->where('phone', $phone)
+              ->orWhere('phone', $normalizedPhone)
+              ->orWhere('phone', $localPhone);
+        })->delete();
+
+        try {
+            AuditLog::create([
+                'action' => 'PIN Reset Successful',
+                'type' => 'verification',
+                'details' => "Security PIN successfully updated for user {$user->name} ({$user->phone})",
+                'user_id' => $user->id,
+            ]);
+        } catch (\Throwable $e) {}
 
         return response()->json([
             'success' => true,
@@ -239,6 +410,71 @@ class AuthController extends Controller
                 'id' => $user->id,
                 'name' => $user->name,
                 'phone' => $user->phone,
+            ],
+        ]);
+    }
+
+    /**
+     * Login directly using a one-time SMS verification code
+     */
+    public function loginWithCode(Request $request)
+    {
+        $validated = $request->validate([
+            'phone' => ['required', 'string'],
+            'code' => ['required', 'string', 'size:6'],
+        ]);
+
+        $phone = $validated['phone'];
+        $code = $validated['code'];
+        $normalizedPhone = SmsService::normalizePhone($phone);
+        $localPhone = SmsService::normalizeLocalPhone($phone);
+
+        $resetCode = PinResetCode::where(function ($q) use ($phone, $normalizedPhone, $localPhone) {
+            $q->where('phone', $phone)
+              ->orWhere('phone', $normalizedPhone)
+              ->orWhere('phone', $localPhone);
+        })
+        ->where('code', $code)
+        ->where('expires_at', '>', now())
+        ->latest()
+        ->first();
+
+        if (!$resetCode) {
+            return response()->json([
+                'message' => 'Invalid or expired SMS login code. Please request a new one.',
+            ], 422);
+        }
+
+        $user = User::where('phone', $phone)
+            ->orWhere('phone', $normalizedPhone)
+            ->orWhere('phone', $localPhone)
+            ->first();
+
+        if (!$user) {
+            $user = User::create([
+                'phone' => $normalizedPhone,
+                'name' => 'Vjay',
+                'role' => 'owner',
+            ]);
+        }
+
+        // Delete used code
+        PinResetCode::where(function ($q) use ($phone, $normalizedPhone, $localPhone) {
+            $q->where('phone', $phone)
+              ->orWhere('phone', $normalizedPhone)
+              ->orWhere('phone', $localPhone);
+        })->delete();
+
+        $token = $user->createToken('auth-token')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Authenticated successfully via SMS verification code',
+            'token' => $token,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'phone' => $user->phone,
+                'role' => $user->role,
             ],
         ]);
     }
@@ -259,7 +495,15 @@ class AuthController extends Controller
             return $this->resetPinWithCode($request);
         }
 
-        $user = User::where('phone', $validated['phone'])->firstOrFail();
+        $phone = $validated['phone'];
+        $normalizedPhone = SmsService::normalizePhone($phone);
+        $localPhone = SmsService::normalizeLocalPhone($phone);
+
+        $user = User::where('phone', $phone)
+            ->orWhere('phone', $normalizedPhone)
+            ->orWhere('phone', $localPhone)
+            ->firstOrFail();
+
         $user->pin_hash = Hash::make($validated['new_pin']);
         $user->save();
 

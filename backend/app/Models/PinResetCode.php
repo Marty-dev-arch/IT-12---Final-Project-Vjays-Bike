@@ -12,6 +12,10 @@ class PinResetCode extends Model
     protected $fillable = [
         'phone',
         'code',
+        'status',
+        'channel',
+        'message',
+        'gateway_response',
         'expires_at',
         'verified_at',
     ];

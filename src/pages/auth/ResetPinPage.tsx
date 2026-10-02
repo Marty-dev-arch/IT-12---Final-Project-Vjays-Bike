@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../services/api';
 import PinInput from '../../components/ui/PinInput';
-import { ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, CheckCircle2, ShieldCheck, MessageSquare } from 'lucide-react';
 
 type ResetStep = 'phone' | 'code' | 'new_pin' | 'confirm_pin' | 'success';
 
@@ -11,7 +11,6 @@ const ResetPinPage: React.FC = () => {
   const [step, setStep] = useState<ResetStep>('phone');
   const [phone, setPhone] = useState(localStorage.getItem('vjays_phone') || '');
   const [code, setCode] = useState('');
-  const [devCode, setDevCode] = useState<string | null>(null);
   const [newPin, setNewPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,34 +20,26 @@ const ResetPinPage: React.FC = () => {
   const { resetPin } = useAuth();
   const navigate = useNavigate();
 
-  // Step 1: Request 6-digit reset code
+  // Step 1: Request 6-digit reset code via real SMS
   const handleSendCode = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError('');
 
-    const cleanPhone = phone.trim();
+    const cleanPhone = phone.trim().replace(/\s+/g, '');
     if (!cleanPhone || cleanPhone.length < 10) {
-      setError('Please enter a valid phone number (at least 10 digits).');
+      setError('Please enter a valid Philippine mobile number (e.g. 09171234567 or 9171234567).');
       return;
     }
 
     setLoading(true);
     try {
       const res = await authApi.forgotPinSendCode(cleanPhone);
-      if (res.code) {
-        setDevCode(res.code);
-      }
-      setSuccessMessage(res.message || 'Verification code sent!');
+      setSuccessMessage(res.message || `Verification code sent via SMS to ${cleanPhone}.`);
       setStep('code');
       startCooldown();
     } catch (err: any) {
-      // Fallback for offline mode or demo
-      console.warn('API error or server offline, activating fallback demo code:', err);
-      const mockCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setDevCode(mockCode);
-      setSuccessMessage('Verification code generated (Demo Mode)');
-      setStep('code');
-      startCooldown();
+      console.warn('API error sending SMS verification:', err);
+      setError(err?.message || 'Unable to send SMS verification code. Please verify your phone number and try again.');
     } finally {
       setLoading(false);
     }
@@ -56,7 +47,7 @@ const ResetPinPage: React.FC = () => {
 
   const startCooldown = () => {
     setResendCooldown(60);
-    const interval = setInterval(() => {
+    const interval = window.setInterval(() => {
       setResendCooldown((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
@@ -67,7 +58,7 @@ const ResetPinPage: React.FC = () => {
     }, 1000);
   };
 
-  // Step 2: Verify 6-digit code
+  // Step 2: Verify 6-digit code received via SMS
   const handleVerifyCodeComplete = async (enteredCode: string) => {
     setError('');
     setCode(enteredCode);
@@ -77,12 +68,7 @@ const ResetPinPage: React.FC = () => {
       await authApi.forgotPinVerifyCode(phone, enteredCode);
       setStep('new_pin');
     } catch (err: any) {
-      // If offline demo code matches
-      if (devCode && enteredCode === devCode) {
-        setStep('new_pin');
-      } else {
-        setError('Invalid or expired verification code. Please check and try again.');
-      }
+      setError('Invalid or expired verification code. Please check your SMS and try again.');
     } finally {
       setLoading(false);
     }
@@ -92,7 +78,7 @@ const ResetPinPage: React.FC = () => {
   const handleNewPinComplete = (pin: string) => {
     setError('');
     if (/^(012345|123456|234567|345678|456789|567890|000000|111111|222222)$/.test(pin)) {
-      setError('PIN is too simple. Please choose a more secure PIN.');
+      setError('PIN is too simple. Please choose a more secure 6-digit PIN.');
       return;
     }
     setNewPin(pin);
@@ -123,7 +109,7 @@ const ResetPinPage: React.FC = () => {
         navigate('/login');
       }, 2000);
     } catch (err: any) {
-      // Local fallback
+      // Local fallback if backend unavailable
       resetPin(newPin, confirmPin);
       setStep('success');
       setTimeout(() => {
@@ -143,43 +129,37 @@ const ResetPinPage: React.FC = () => {
         >
           {/* Header */}
           <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="p-2 rounded-xl bg-orange-100 dark:bg-orange-950/40 text-brand-orange dark:text-[#FB714B]">
+                <ShieldCheck className="w-5 h-5" />
+              </span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">
+                Security Verification
+              </span>
+            </div>
             <h1 className="text-neutral-900 dark:text-[#EDEDED] text-[24px] font-bold leading-tight">
               {step === 'phone' && 'Forgot PIN'}
-              {step === 'code' && 'Enter Verification Code'}
+              {step === 'code' && 'Enter SMS Code'}
               {step === 'new_pin' && 'Create New PIN'}
               {step === 'confirm_pin' && 'Confirm New PIN'}
               {step === 'success' && 'PIN Reset Successful!'}
             </h1>
             <p className="text-neutral-500 dark:text-[#A1A1A1] text-xs leading-relaxed">
-              {step === 'phone' && 'Enter your registered phone number to receive a 6-digit security code.'}
-              {step === 'code' && `We sent a 6-digit code to ${phone}. Enter it below to verify.`}
+              {step === 'phone' && 'Enter your registered store mobile number to receive a 6-digit security code via SMS.'}
+              {step === 'code' && `We sent a 6-digit security code via SMS to ${phone}. Enter it below to verify.`}
               {step === 'new_pin' && 'Enter your new 6-digit security PIN.'}
               {step === 'confirm_pin' && 'Confirm your new 6-digit security PIN to finish.'}
-              {step === 'success' && 'Your PIN has been updated. Redirecting to login...'}
+              {step === 'success' && 'Your PIN has been updated securely. Redirecting to login...'}
             </p>
           </div>
 
-          {/* OTP Code Display */}
-          {devCode && (step === 'code' || step === 'phone') && (
-            <div className="py-1 px-0 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-neutral-500 dark:text-[#A1A1A1]">
-                  This is your OTP code:
-                </p>
-                <p className="text-2xl font-mono font-bold tracking-widest text-neutral-900 dark:text-[#EDEDED] mt-0.5">
-                  {devCode}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setCode(devCode);
-                  handleVerifyCodeComplete(devCode);
-                }}
-                className="px-3 py-1.5 text-xs font-semibold bg-neutral-100 hover:bg-neutral-200 dark:bg-[#1A1A1A] dark:hover:bg-[#262626] text-neutral-800 dark:text-[#EDEDED] rounded-xl border border-neutral-200 dark:border-[#262626] cursor-pointer transition-all active:scale-95"
-              >
-                Auto-Fill
-              </button>
+          {/* SMS Status Notification for Security */}
+          {step === 'code' && (
+            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/50 text-xs text-orange-900 dark:text-orange-300">
+              <MessageSquare className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
+              <span>
+                SMS sent with security PIN to <strong>{phone}</strong>. Please check your inbox.
+              </span>
             </div>
           )}
 
@@ -195,17 +175,17 @@ const ResetPinPage: React.FC = () => {
             <form onSubmit={handleSendCode} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-neutral-700 dark:text-[#A1A1A1] text-xs font-medium">
-                  Registered Phone Number
+                  Registered Mobile Number
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm font-medium">
                     🇵🇭 +63
                   </span>
                   <input
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="9123456789"
+                    placeholder="917 123 4567"
                     className="w-full pl-16 pr-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#121212] text-neutral-900 dark:text-white text-sm outline-none focus:border-neutral-900 dark:focus:border-neutral-400 transition-colors"
                     required
                   />
@@ -218,7 +198,7 @@ const ResetPinPage: React.FC = () => {
                 className="w-full mt-2 py-3 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-bold text-sm border-0 hover:bg-neutral-800 dark:hover:bg-neutral-200 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {loading && <RefreshCw className="w-4 h-4 animate-spin" />}
-                <span>Send Verification Code</span>
+                <span>Send SMS Verification Code</span>
               </button>
             </form>
           )}
@@ -249,7 +229,7 @@ const ResetPinPage: React.FC = () => {
                   onClick={() => handleSendCode()}
                   className="text-orange-600 dark:text-orange-400 font-semibold bg-transparent border-0 cursor-pointer disabled:opacity-50"
                 >
-                  {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+                  {resendCooldown > 0 ? `Resend SMS in ${resendCooldown}s` : 'Resend SMS code'}
                 </button>
               </div>
             </div>

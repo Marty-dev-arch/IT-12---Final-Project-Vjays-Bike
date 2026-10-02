@@ -12,6 +12,10 @@ return new class extends Migration
             $table->id();
             $table->string('phone')->index();
             $table->string('code', 6);
+            $table->string('status', 50)->default('sent');
+            $table->string('channel', 50)->default('sms');
+            $table->text('message')->nullable();
+            $table->text('gateway_response')->nullable();
             $table->timestamp('expires_at');
             $table->timestamp('verified_at')->nullable();
             $table->timestamps();
