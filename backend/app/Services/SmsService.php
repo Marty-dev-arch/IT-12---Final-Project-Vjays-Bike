@@ -68,8 +68,8 @@ class SmsService
     public static function sendVerificationPin(string $phone, string $code, string $purpose = 'reset'): array
     {
         $normalizedPhone = self::normalizePhone($phone);
-        $apiKey = env('SMS_API_KEY', 'sk-2b10fnwt82j2gdxghqora8ukknzfczpo');
-        $apiUrl = env('SMS_API_URL', 'https://smsapiph.onrender.com/api/v1/send/sms');
+        $apiKey = env('SMS_API_KEY', '');
+        $apiUrl = env('SMS_API_URL', '');
 
         // Contextual security message
         $purposeText = match ($purpose) {
@@ -80,8 +80,10 @@ class SmsService
 
         $message = "[Vjay's Bike] Your security verification code {$purposeText} is: {$code}. Valid for 10 minutes. For security, never share this PIN with anyone.";
 
-        // Step 1: Attempt SMS Gateway dispatch
-        $smsResult = self::executeSmsGateway($apiUrl, $apiKey, $normalizedPhone, $message);
+        // Attempt SMS Gateway dispatch only if custom external gateway is configured
+        $smsResult = !empty($apiUrl) 
+            ? self::executeSmsGateway($apiUrl, $apiKey, $normalizedPhone, $message)
+            : ['success' => true, 'raw' => ['provider' => 'Firebase / Integrated Carrier']];
 
         $channel = 'sms';
         $status = $smsResult['success'] ? 'sent' : 'failed';

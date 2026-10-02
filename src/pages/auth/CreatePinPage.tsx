@@ -32,12 +32,7 @@ const CreatePinPage: React.FC = () => {
     setError('');
     setLoading(true);
     try {
-      try {
-        await sendFirebaseSmsOtp(phone);
-      } catch (fbErr) {
-        console.warn('Firebase SMS provider note:', fbErr);
-        await authApi.requestPinCode(phone, 'create_pin');
-      }
+      await sendFirebaseSmsOtp(phone);
 
       setResendCooldown(60);
       const timer = window.setInterval(() => {
@@ -61,26 +56,10 @@ const CreatePinPage: React.FC = () => {
     setSmsCode(code);
     setLoading(true);
     try {
-      let firebaseVerified = false;
-      try {
-        firebaseVerified = await verifyFirebaseSmsOtp(code);
-      } catch (fbErr) {
-        console.warn('Firebase verify note, verifying with backend:', fbErr);
-      }
-
-      try {
-        await authApi.verifyPinCode(phone, code);
-      } catch (beErr) {
-        if (!firebaseVerified) throw beErr;
-      }
-
+      await verifyFirebaseSmsOtp(code);
       setStep('enter_pin');
     } catch (err: any) {
-      if (code.length === 6) {
-        setStep('enter_pin');
-      } else {
-        setError('Invalid or expired verification code. Please check your SMS.');
-      }
+      setError(err?.message || 'Invalid or expired verification code. Please check your SMS.');
     } finally {
       setLoading(false);
     }

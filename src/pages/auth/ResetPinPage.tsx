@@ -20,7 +20,7 @@ const ResetPinPage: React.FC = () => {
   const { resetPin } = useAuth();
   const navigate = useNavigate();
 
-  // Step 1: Request 6-digit reset code via real SMS (Firebase with backend fallback)
+  // Step 1: Request 6-digit reset code via real SMS (Firebase Phone Auth)
   const handleSendCode = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError('');
@@ -32,23 +32,14 @@ const ResetPinPage: React.FC = () => {
     }
 
     setLoading(true);
-    let sentViaFirebase = false;
 
     try {
-      // 1. Send real SMS using Firebase (10,000 free SMS/month, no prepaid load needed)
-      try {
-        await sendFirebaseSmsOtp(cleanPhone);
-        sentViaFirebase = true;
-      } catch (fbErr: any) {
-        console.warn('Firebase SMS provider note:', fbErr);
-        // If Phone Auth is not yet toggled ON in console or domain unauthorized, fallback to backend gateway
-        await authApi.forgotPinSendCode(cleanPhone);
-      }
-
+      // Send real SMS using Firebase Phone Authentication
+      await sendFirebaseSmsOtp(cleanPhone);
       setStep('code');
       startCooldown();
     } catch (err: any) {
-      console.warn('SMS dispatch error:', err);
+      console.warn('Firebase SMS dispatch error:', err);
       setError(err?.message || 'Unable to send SMS verification code. Please check your phone number and try again.');
     } finally {
       setLoading(false);
@@ -75,24 +66,10 @@ const ResetPinPage: React.FC = () => {
     setLoading(true);
 
     try {
-      // Try Firebase verification
-      let firebaseVerified = false;
-      try {
-        firebaseVerified = await verifyFirebaseSmsOtp(enteredCode);
-      } catch (fbErr) {
-        console.warn('Firebase verify error, falling back to backend verify:', fbErr);
-      }
-
-      // Also sync verification with backend
-      try {
-        await authApi.forgotPinVerifyCode(phone, enteredCode);
-      } catch (beErr) {
-        if (!firebaseVerified) throw beErr;
-      }
-
+      await verifyFirebaseSmsOtp(enteredCode);
       setStep('new_pin');
     } catch (err: any) {
-      setError('Invalid or expired verification code. Please check your SMS and try again.');
+      setError(err?.message || 'Invalid or expired verification code. Please check your SMS and try again.');
     } finally {
       setLoading(false);
     }
