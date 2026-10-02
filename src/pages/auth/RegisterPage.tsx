@@ -79,7 +79,7 @@ const RegisterPage: React.FC = () => {
               style={{ boxShadow: '0px 1px 2px #0000000D' }}
             >
               {loading && <RefreshCw className="w-4 h-4 animate-spin" />}
-              <span className="text-[15px] font-bold">Send SMS Code & Continue</span>
+              <span className="text-[15px] font-bold">Continue</span>
             </button>
           </div>
 
@@ -87,7 +87,7 @@ const RegisterPage: React.FC = () => {
           <div className="flex justify-center items-center pt-[22px] gap-[5px]">
             <HiOutlineLockClosed className="w-3.5 h-3.5 text-zinc-400 dark:text-[#737373]" />
             <span className="text-zinc-400 dark:text-[#737373] text-xs">
-              End-to-end encrypted SMS verification
+              End-to-end encrypted verification
             </span>
           </div>
         </div>
