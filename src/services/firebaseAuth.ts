@@ -22,7 +22,7 @@ export const formatToE164 = (phone: string): string => {
 };
 
 /**
- * Create or reuse the invisible reCAPTCHA verifier for Firebase Phone Auth
+ * Create or reuse a fresh invisible reCAPTCHA verifier for Firebase Phone Auth
  */
 export const getRecaptchaVerifier = (containerId: string = 'recaptcha-container'): RecaptchaVerifier => {
   if (recaptchaVerifier) {
@@ -32,15 +32,19 @@ export const getRecaptchaVerifier = (containerId: string = 'recaptcha-container'
     recaptchaVerifier = null;
   }
 
-  // Ensure target container exists in DOM
-  let container = document.getElementById(containerId);
-  if (!container) {
-    container = document.createElement('div');
-    container.id = containerId;
-    document.body.appendChild(container);
+  // Remove existing container and any lingering badges to guarantee a fresh DOM element
+  const oldContainer = document.getElementById(containerId);
+  if (oldContainer) {
+    oldContainer.remove();
   }
+  document.querySelectorAll('.grecaptcha-badge').forEach((b) => b.remove());
 
-  recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+  // Create brand new container node
+  const container = document.createElement('div');
+  container.id = containerId;
+  document.body.appendChild(container);
+
+  recaptchaVerifier = new RecaptchaVerifier(auth, container, {
     size: 'invisible',
     callback: () => {
       // reCAPTCHA solved automatically
@@ -68,13 +72,18 @@ export const sendFirebaseSmsOtp = async (phone: string, containerId: string = 'r
     confirmationResult = await signInWithPhoneNumber(auth, e164Phone, verifier);
     return true;
   } catch (error: any) {
-    // Reset recaptcha verifier on failure so next attempt works
+    // Reset recaptcha verifier and clean DOM on failure so next attempt works smoothly
     if (recaptchaVerifier) {
       try {
         recaptchaVerifier.clear();
       } catch {}
       recaptchaVerifier = null;
     }
+    const el = document.getElementById(containerId);
+    if (el) {
+      el.remove();
+    }
+    document.querySelectorAll('.grecaptcha-badge').forEach((b) => b.remove());
 
     const code = error?.code || '';
     if (code === 'auth/unauthorized-domain') {
