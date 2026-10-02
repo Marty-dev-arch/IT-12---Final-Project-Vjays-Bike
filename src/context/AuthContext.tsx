@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import type { User } from '../types';
+import { authApi } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -57,6 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         setIsAuthenticated(true);
         sessionStorage.setItem('vjays_authenticated', 'true');
+        authApi.login(pin).catch(() => {});
         return true;
       }
       // If no PIN exists yet on this device (first time), automatically register this PIN!
@@ -71,6 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         setIsAuthenticated(true);
         sessionStorage.setItem('vjays_authenticated', 'true');
+        authApi.createPin(pin).catch(() => {});
         return true;
       }
     } catch (e) {
@@ -90,6 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = useCallback((phone: string): boolean => {
     if (phone.length >= 10) {
       localStorage.setItem('vjays_phone', phone);
+      authApi.register(phone).catch(() => {});
       return true;
     }
     return false;
@@ -107,6 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       setIsAuthenticated(true);
       sessionStorage.setItem('vjays_authenticated', 'true');
+      authApi.createPin(pin).catch(() => {});
       return true;
     }
     return false;
@@ -116,6 +121,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (newPin.length === 6 && newPin === confirmPin) {
       localStorage.setItem('vjays_pin', newPin);
       setStoredPin(newPin);
+      const phone = localStorage.getItem('vjays_phone') || '09123456789';
+      authApi.resetPin(newPin, confirmPin, phone).catch(() => {});
       return true;
     }
     return false;

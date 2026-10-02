@@ -58,4 +58,25 @@ class AuditLogController extends Controller
 
         return response()->json($logs);
     }
+
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'action' => ['required', 'string', 'max:255'],
+            'type' => ['nullable', 'string', 'in:stock-in,stock-out,adjustment,verification'],
+            'details' => ['required', 'string'],
+            'product_name' => ['nullable', 'string', 'max:255'],
+            'sku' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $log = AuditLog::create([
+            'action' => $validated['action'],
+            'type' => $validated['type'] ?? 'adjustment',
+            'details' => $validated['details'],
+            'user_id' => $request->user()?->id,
+        ]);
+
+        return response()->json($log, 201);
+    }
 }
+

@@ -111,6 +111,10 @@ export const dashboardApi = {
 export const auditApi = {
   getLogs: () => request('/audit-logs'),
   getLogsByDate: (from: string, to: string) => request(`/audit-logs?from=${from}&to=${to}`),
+  create: (data: { action: string; details: string; type?: string; product_name?: string; sku?: string }) => request('/audit-logs', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 };
 
 // Restock Schedules endpoints (with Automated Restock Execution)

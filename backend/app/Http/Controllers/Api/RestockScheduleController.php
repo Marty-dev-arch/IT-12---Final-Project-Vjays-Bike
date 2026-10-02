@@ -19,7 +19,20 @@ class RestockScheduleController extends Controller
     {
         $schedules = RestockSchedule::with('product')
             ->orderBy('scheduled_date', 'asc')
-            ->get();
+            ->get()
+            ->map(function ($s) {
+                return [
+                    'id' => (string) $s->id,
+                    'productId' => (string) $s->product_id,
+                    'productName' => $s->product_name ?: ($s->product?->name ?? 'Unknown Part'),
+                    'sku' => $s->product?->sku ?? 'N/A',
+                    'targetQuantity' => (int) ($s->target_quantity ?? 1),
+                    'scheduledDate' => $s->scheduled_date,
+                    'notes' => $s->notes ?? '',
+                    'status' => $s->status,
+                    'createdAt' => $s->created_at?->toIso8601String() ?? now()->toIso8601String(),
+                ];
+            });
 
         return response()->json($schedules);
     }
@@ -31,13 +44,24 @@ class RestockScheduleController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
-            'scheduled_date' => 'required|date',
+            'product_id' => 'required',
+            'scheduled_date' => 'required',
             'target_quantity' => 'nullable|integer|min:1',
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $product = Product::findOrFail($validated['product_id']);
+        $pId = $validated['product_id'];
+        $product = Product::where('id', $pId)
+            ->orWhere('sku', $pId)
+            ->orWhere('name', $pId)
+            ->first();
+
+        if (!$product) {
+            return response()->json([
+                'message' => 'Product not found for schedule',
+            ], 404);
+        }
+
         $targetQty = $validated['target_quantity'] ?? 1;
         $scheduledDate = $validated['scheduled_date'];
         $todayStr = now()->toDateString();

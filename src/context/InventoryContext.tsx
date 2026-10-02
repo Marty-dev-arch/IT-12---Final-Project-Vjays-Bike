@@ -49,6 +49,7 @@ interface InventoryContextType {
   alertModalData: AlertModalConfig | null;
   showAlertModal: (config: Omit<AlertModalConfig, 'isOpen'>) => void;
   closeAlertModal: () => void;
+  refreshFromDatabase: () => Promise<void>;
 }
 
 export interface AlertModalConfig {
@@ -186,35 +187,107 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setAlertModalData(null);
   }, []);
 
-  // Load live products from backend database on mount
-  useEffect(() => {
-    productsApi.getAll()
-      .then((data: any) => {
-        if (Array.isArray(data)) {
-          const mapped: Product[] = data.map((item: any) => ({
-            id: String(item.id),
-            name: item.name,
-            sku: item.sku,
-            category: item.category,
-            brand: item.brand,
-            price: Number(item.price),
-            costPrice: Number(item.cost_price ?? item.price),
-            quantity: Number(item.quantity),
-            minStock: Number(item.min_stock ?? 5),
-            maxCapacity: Number(item.max_capacity ?? item.quantity),
-            location: item.location || 'Warehouse A',
-            status: item.status,
-            image: item.image,
-            createdAt: item.created_at,
-            updatedAt: item.updated_at,
-          }));
-          setProducts(mapped);
-        }
-      })
-      .catch((err) => {
-        console.warn('Backend API offline or unreachable, using local storage:', err);
-      });
+  // Load live data from Neon PostgreSQL backend database for ALL tables
+  const refreshFromDatabase = useCallback(async () => {
+    try {
+      const [prodsData, movsData, logsData, schedsData] = await Promise.all([
+        productsApi.getAll().catch(() => null),
+        stockApi.getMovements().catch(() => null),
+        auditApi.getLogs().catch(() => null),
+        schedulesApi.getAll().catch(() => null),
+      ]);
+
+      if (Array.isArray(prodsData)) {
+        const mapped: Product[] = prodsData.map((item: any) => ({
+          id: String(item.id),
+          name: item.name,
+          sku: item.sku,
+          category: item.category,
+          brand: item.brand,
+          price: Number(item.price),
+          costPrice: Number(item.cost_price ?? item.price),
+          quantity: Number(item.quantity),
+          minStock: Number(item.min_stock ?? 5),
+          maxCapacity: Number(item.max_capacity ?? item.quantity),
+          location: item.location || 'Warehouse A',
+          status: item.status,
+          image: item.image,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+        }));
+        setProducts(mapped);
+      }
+
+      if (Array.isArray(movsData)) {
+        const mappedMovs: StockMovement[] = movsData.map((m: any) => ({
+          id: String(m.id),
+          productId: String(m.productId || m.product_id),
+          productName: m.productName || m.product_name || 'Part',
+          sku: m.sku || 'N/A',
+          image: m.image,
+          type: m.type,
+          quantity: Number(m.quantity),
+          timestamp: m.timestamp || new Date().toLocaleString(),
+          notes: m.notes,
+        }));
+        setMovements(mappedMovs);
+      }
+
+      if (Array.isArray(logsData)) {
+        const mappedLogs: AuditLog[] = logsData.map((l: any) => ({
+          id: String(l.id),
+          action: l.action,
+          productName: l.productName || l.product_name || 'Item',
+          sku: l.sku || 'SYS-LOG',
+          brand: l.brand || 'Generic',
+          category: l.category || 'General',
+          details: l.details,
+          user: l.user || 'Vjay (Owner)',
+          timestamp: l.timestamp || new Date().toLocaleString(),
+          type: l.type || 'adjustment',
+        }));
+        setAuditLogs(mappedLogs);
+      }
+
+      if (Array.isArray(schedsData)) {
+        const mappedScheds: RestockSchedule[] = schedsData.map((s: any) => ({
+          id: String(s.id),
+          productId: String(s.productId || s.product_id),
+          productName: s.productName || s.product_name || 'Selected part',
+          sku: s.sku || 'N/A',
+          targetQuantity: Number(s.targetQuantity || s.target_quantity || 1),
+          scheduledDate: s.scheduledDate || s.scheduled_date,
+          notes: s.notes || '',
+          status: s.status || 'scheduled',
+          createdAt: s.createdAt || s.created_at || new Date().toISOString(),
+        }));
+        setSchedules(mappedScheds);
+      }
+    } catch (err) {
+      console.warn('Realtime database sync error:', err);
+    }
   }, []);
+
+  // Periodic realtime sync with Neon database & on window focus
+  useEffect(() => {
+    refreshFromDatabase();
+
+    const interval = setInterval(() => {
+      refreshFromDatabase();
+    }, 6000);
+
+    const onFocus = () => {
+      refreshFromDatabase();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [refreshFromDatabase]);
 
   useEffect(() => {
     localStorage.setItem('vjays_products', JSON.stringify(products));
@@ -236,65 +309,6 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     localStorage.setItem('vjays_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
-  // Auto-clean orphaned stock movements and audit logs whose products were deleted
-  useEffect(() => {
-    if (products.length === 0) {
-      setMovements((prev) => {
-        if (prev.length > 0) {
-          localStorage.removeItem('vjays_movements');
-          return [];
-        }
-        return prev;
-      });
-      setAuditLogs((prev) => {
-        if (prev.length > 0) {
-          localStorage.removeItem('vjays_audit_logs');
-          return [];
-        }
-        return prev;
-      });
-      return;
-    }
-
-    const activeIds = new Set(products.map((p) => String(p.id)));
-    const activeSkus = new Set(products.map((p) => (p.sku || '').trim().toLowerCase()).filter(Boolean));
-    const activeNames = new Set(products.map((p) => (p.name || '').trim().toLowerCase()).filter(Boolean));
-
-    setMovements((prev) => {
-      const valid = prev.filter(
-        (m) =>
-          activeIds.has(String(m.productId)) ||
-          (m.sku && activeSkus.has(m.sku.trim().toLowerCase())) ||
-          (m.productName && activeNames.has(m.productName.trim().toLowerCase()))
-      );
-      if (valid.length !== prev.length) {
-        localStorage.setItem('vjays_movements', JSON.stringify(valid));
-        return valid;
-      }
-      return prev;
-    });
-
-    setAuditLogs((prev) => {
-      const valid = prev.filter((log) => {
-        // Exclude deletion action logs from frontend history view
-        if (
-          log.action === 'Deleted Product' ||
-          log.action === 'Deleted All Products' ||
-          log.action === 'Deleted Category Products'
-        ) {
-          return false;
-        }
-        const skuMatch = log.sku && activeSkus.has(log.sku.trim().toLowerCase());
-        const nameMatch = log.productName && activeNames.has(log.productName.trim().toLowerCase());
-        return skuMatch || nameMatch;
-      });
-      if (valid.length !== prev.length) {
-        localStorage.setItem('vjays_audit_logs', JSON.stringify(valid));
-        return valid;
-      }
-      return prev;
-    });
-  }, [products]);
 
   // Check for restock schedules that are active today or due, and AUTOMATICALLY RESTOCK THEM!
   useEffect(() => {
@@ -469,6 +483,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               prev.map((p) => (p.sku === newProduct.sku ? { ...p, id: String(created.id) } : p))
             );
           }
+          refreshFromDatabase();
         })
         .catch((err) => {
           console.warn('Database server offline, saved in local state:', err);
@@ -507,7 +522,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       return newProduct;
     },
-    []
+    [refreshFromDatabase]
   );
 
   const updateProduct = useCallback((id: string, updates: Partial<Product>) => {
@@ -526,10 +541,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ...updates,
       cost_price: updates.costPrice,
       min_stock: updates.minStock,
-    }).catch((err) => {
-      console.warn('Database server offline, updated in local state:', err);
-    });
-  }, []);
+    })
+      .then(() => refreshFromDatabase())
+      .catch((err) => {
+        console.warn('Database server offline, updated in local state:', err);
+      });
+  }, [refreshFromDatabase]);
 
   const deleteProduct = useCallback(
     (id: string) => {
@@ -594,11 +611,13 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         )
       );
 
-      productsApi.delete(targetId, { sku: targetSku, name: targetName }).catch((err) => {
-        console.warn('Database delete failed or offline:', err);
-      });
+      productsApi.delete(targetId, { sku: targetSku, name: targetName })
+        .then(() => refreshFromDatabase())
+        .catch((err) => {
+          console.warn('Database delete failed or offline:', err);
+        });
     },
-    [products]
+    [products, refreshFromDatabase]
   );
 
   const deleteProductsByCategory = useCallback(
@@ -675,11 +694,13 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setAuditLogs((prev) => [catClearLog, ...prev]);
       }
 
-      productsApi.deleteAll(cat).catch((err) => {
-        console.warn('Database server offline, deleted in local state:', err);
-      });
+      productsApi.deleteAll(cat)
+        .then(() => refreshFromDatabase())
+        .catch((err) => {
+          console.warn('Database server offline, deleted in local state:', err);
+        });
     },
-    [products]
+    [products, refreshFromDatabase]
   );
 
   const deleteAllProducts = useCallback(() => {
@@ -789,9 +810,11 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           scheduled_date: data.scheduledDate,
           target_quantity: restockQty,
           notes: data.notes,
-        }).catch((err) => {
-          console.warn('Backend database offline, schedule & auto-restock recorded in local state:', err);
-        });
+        })
+          .then(() => refreshFromDatabase())
+          .catch((err) => {
+            console.warn('Backend database offline, schedule & auto-restock recorded in local state:', err);
+          });
       } else {
         // Scheduled for future date: expand product capacity level now to accommodate restock
         if (prod) {
@@ -829,14 +852,16 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           scheduled_date: data.scheduledDate,
           target_quantity: restockQty,
           notes: data.notes,
-        }).catch((err) => {
-          console.warn('Backend database offline, schedule recorded in local state:', err);
-        });
+        })
+          .then(() => refreshFromDatabase())
+          .catch((err) => {
+            console.warn('Backend database offline, schedule recorded in local state:', err);
+          });
       }
 
       return newSchedule;
     },
-    [products, showAlertModal]
+    [products, showAlertModal, refreshFromDatabase]
   );
 
   const deleteSchedule = useCallback((id: string) => {
@@ -847,10 +872,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setSchedules((prev) => prev.filter((s) => s.id !== id));
     setNotifications((prev) => prev.filter((n) => n.scheduleId !== id));
 
-    schedulesApi.delete(id, { sku: targetSku, productName: targetName }).catch((err) => {
-      console.warn('Database delete schedule failed or offline:', err);
-    });
-  }, [schedules]);
+    schedulesApi.delete(id, { sku: targetSku, productName: targetName })
+      .then(() => refreshFromDatabase())
+      .catch((err) => {
+        console.warn('Database delete schedule failed or offline:', err);
+      });
+  }, [schedules, refreshFromDatabase]);
 
   const markNotificationAsRead = useCallback((id: string) => {
     setNotifications((prev) =>
@@ -920,13 +947,15 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setAuditLogs((prev) => cleanDuplicateAuditLogs([log, ...prev]));
 
       // Save stock intake in backend database
-      stockApi.stockIn(productId, quantity, notes).catch((err) => {
-        console.warn('Database server offline, stock-in saved in local state:', err);
-      });
+      stockApi.stockIn(productId, quantity, notes)
+        .then(() => refreshFromDatabase())
+        .catch((err) => {
+          console.warn('Database server offline, stock-in saved in local state:', err);
+        });
 
       return true;
     },
-    [products]
+    [products, refreshFromDatabase]
   );
 
   const stockOut = useCallback(
@@ -978,9 +1007,11 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setAuditLogs((prev) => cleanDuplicateAuditLogs([log, ...prev]));
 
       // Save stock dispatch in backend database
-      stockApi.stockOut(productId, quantity, notes || reason).catch((err) => {
-        console.warn('Database server offline, stock-out saved in local state:', err);
-      });
+      stockApi.stockOut(productId, quantity, notes || reason)
+        .then(() => refreshFromDatabase())
+        .catch((err) => {
+          console.warn('Database server offline, stock-out saved in local state:', err);
+        });
 
       // Low stock alerting: if quantity drops to or below minStock, trigger alert chime, notification, and popup modal alert
       if (newQty <= target.minStock) {
@@ -1010,43 +1041,9 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       return true;
     },
-    [products]
+    [products, showAlertModal, refreshFromDatabase]
   );
 
-  // Initial attempt to fetch products from backend database if available
-  useEffect(() => {
-    productsApi.getAll()
-      .then((data: any) => {
-        if (Array.isArray(data)) {
-          if (data.length > 0) {
-            const mapped: Product[] = data.map((d: any) => ({
-              id: String(d.id),
-              name: d.name,
-              sku: d.sku,
-              category: d.category,
-              brand: d.brand || '',
-              price: Number(d.price),
-              costPrice: Number(d.cost_price ?? d.costPrice ?? 0),
-              quantity: Number(d.quantity ?? 0),
-              minStock: Number(d.min_stock ?? d.minStock ?? 5),
-              maxCapacity: d.max_capacity ?? d.maxCapacity,
-              location: d.location || 'Warehouse Shelf A1',
-              status: d.status || computeStatus(Number(d.quantity ?? 0), Number(d.min_stock ?? 5)),
-              image: d.image || '',
-              createdAt: d.created_at || new Date().toISOString(),
-              updatedAt: d.updated_at || new Date().toISOString(),
-            }));
-            setProducts(mapped);
-          } else {
-            // If the MySQL database is online and genuinely empty, reflect empty catalog
-            setProducts([]);
-          }
-        }
-      })
-      .catch(() => {
-        // Fallback to local state if database server is not yet running
-      });
-  }, []);
 
   const getStats = useCallback((): DashboardStats => {
     const stockValuation = products.reduce((sum, p) => sum + p.costPrice * p.quantity, 0);
@@ -1164,6 +1161,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         alertModalData,
         showAlertModal,
         closeAlertModal,
+        refreshFromDatabase,
       }}
     >
       {children}

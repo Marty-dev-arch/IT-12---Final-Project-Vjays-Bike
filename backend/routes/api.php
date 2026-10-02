@@ -65,22 +65,33 @@ Route::prefix('dashboard')->group(function () {
 
 // Audit Logs Ledger Routes
 Route::get('/audit-logs', [AuditLogController::class, 'index']);
+Route::post('/audit-logs', [AuditLogController::class, 'store']);
 
 // System & Database Operations (for Vercel Serverless & Postgres Health)
 Route::get('/system/db-status', function () {
     try {
         $driver = \Illuminate\Support\Facades\DB::connection()->getDriverName();
-        $productsCount = \App\Models\Product::count();
-        $auditLogsCount = \App\Models\AuditLog::count();
-        $movementsCount = \App\Models\StockMovement::count();
+
+        // Ensure default owner user exists in database
+        if (\App\Models\User::count() === 0) {
+            \App\Models\User::create([
+                'name' => 'Vjay',
+                'phone' => '09123456789',
+                'role' => 'owner',
+                'pin_hash' => \Illuminate\Support\Facades\Hash::make('123456'),
+            ]);
+        }
 
         return response()->json([
             'status' => 'connected',
             'driver' => $driver,
             'counts' => [
-                'products' => $productsCount,
-                'audit_logs' => $auditLogsCount,
-                'stock_movements' => $movementsCount,
+                'products' => \App\Models\Product::count(),
+                'stock_movements' => \App\Models\StockMovement::count(),
+                'audit_logs' => \App\Models\AuditLog::count(),
+                'restock_schedules' => \App\Models\RestockSchedule::count(),
+                'users' => \App\Models\User::count(),
+                'pin_reset_codes' => \App\Models\PinResetCode::count(),
             ],
             'timestamp' => now()->toIso8601String(),
         ]);
