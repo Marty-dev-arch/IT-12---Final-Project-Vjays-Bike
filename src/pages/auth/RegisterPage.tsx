@@ -98,15 +98,6 @@ const RegisterPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Brand footer */}
-        <div className="flex flex-col items-center pt-8">
-          <img 
-            src="/logo.png" 
-            alt="Vjay's Logo" 
-            className="w-10 h-10 object-contain select-none" 
-          />
-        </div>
-
         {/* Login link */}
         <div className="mt-4">
           <span className="text-zinc-400 dark:text-[#737373] text-xs">

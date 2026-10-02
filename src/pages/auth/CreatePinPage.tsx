@@ -4,8 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../services/api';
 import { sendFirebaseSmsOtp, verifyFirebaseSmsOtp } from '../../services/firebaseAuth';
 import PinInput from '../../components/ui/PinInput';
-import { HiOutlineInformationCircle } from 'react-icons/hi2';
-import { MessageSquare, RefreshCw, ShieldCheck } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 
 const CreatePinPage: React.FC = () => {
   const [step, setStep] = useState<'verify_sms' | 'enter_pin' | 'confirm_pin'>('verify_sms');
@@ -109,15 +108,6 @@ const CreatePinPage: React.FC = () => {
           >
             {/* Header */}
             <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-orange-100 dark:bg-orange-950/40 text-brand-orange dark:text-[#FB714B]">
-                  <ShieldCheck className="w-4 h-4" />
-                </span>
-                <span className="text-xs font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">
-                  {step === 'verify_sms' ? 'Step 1: Phone Verification' : 'Step 2: Security PIN'}
-                </span>
-              </div>
-
               <h1 className="text-zinc-950 dark:text-[#EDEDED] text-[28px] sm:text-[32px] font-bold leading-tight">
                 {step === 'verify_sms' && 'Verify Phone via SMS'}
                 {step === 'enter_pin' && 'Create Security PIN'}
@@ -155,13 +145,6 @@ const CreatePinPage: React.FC = () => {
             {/* Step 1: Verify SMS code */}
             {step === 'verify_sms' && (
               <div className="flex flex-col gap-5">
-                <div className="flex items-center gap-2.5 p-3 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/50 text-xs text-orange-900 dark:text-orange-300">
-                  <MessageSquare className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
-                  <span>
-                    We dispatched a 6-digit verification code via SMS to your phone.
-                  </span>
-                </div>
-
                 <div className="flex flex-col items-center gap-2">
                   <span className="text-zinc-800 dark:text-[#A1A1A1] text-xs font-bold">
                     Enter 6-digit SMS verification code
@@ -245,15 +228,6 @@ const CreatePinPage: React.FC = () => {
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Brand footer */}
-          <div className="flex flex-col items-center pt-8">
-            <img 
-              src="/logo.png" 
-              alt="Vjay's Logo" 
-              className="w-10 h-10 object-contain select-none" 
-            />
           </div>
         </div>
       </div>

@@ -26,15 +26,6 @@ const LoginPage: React.FC = () => {
           className="flex flex-col bg-white dark:bg-[#0A0A0A] w-full max-w-[448px] p-6 sm:p-[45px] gap-6 sm:gap-7 rounded-3xl border border-solid border-brand-border dark:border-[#262626]"
           style={{ boxShadow: '0px 4px 25px #00000005' }}
         >
-          {/* Logo */}
-          <div className="flex flex-col items-center justify-center -mb-2">
-            <img 
-              src="/logo.png" 
-              alt="Vjay's Logo" 
-              className="w-24 h-24 object-contain drop-shadow-md select-none" 
-            />
-          </div>
-
           {/* Header */}
           <div className="flex flex-col gap-[7px] text-center">
             <h1 className="text-zinc-950 dark:text-[#EDEDED] text-[30px] font-bold leading-tight">

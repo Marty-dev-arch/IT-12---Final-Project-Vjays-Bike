@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../services/api';
 import { sendFirebaseSmsOtp, verifyFirebaseSmsOtp } from '../../services/firebaseAuth';
 import PinInput from '../../components/ui/PinInput';
-import { ArrowLeft, RefreshCw, CheckCircle2, ShieldCheck, MessageSquare } from 'lucide-react';
+import { ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 type ResetStep = 'phone' | 'code' | 'new_pin' | 'confirm_pin' | 'success';
 
@@ -133,14 +133,6 @@ const ResetPinPage: React.FC = () => {
         >
           {/* Header */}
           <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="p-2 rounded-xl bg-orange-100 dark:bg-orange-950/40 text-brand-orange dark:text-[#FB714B]">
-                <ShieldCheck className="w-5 h-5" />
-              </span>
-              <span className="text-xs font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">
-                Security Verification
-              </span>
-            </div>
             <h1 className="text-neutral-900 dark:text-[#EDEDED] text-[24px] font-bold leading-tight">
               {step === 'phone' && 'Forgot PIN'}
               {step === 'code' && 'Enter SMS Code'}
@@ -156,16 +148,6 @@ const ResetPinPage: React.FC = () => {
               {step === 'success' && 'Your PIN has been updated securely. Redirecting to login...'}
             </p>
           </div>
-
-          {/* SMS Status Notification for Security */}
-          {step === 'code' && (
-            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900/50 text-xs text-orange-900 dark:text-orange-300">
-              <MessageSquare className="w-4 h-4 text-orange-600 dark:text-orange-400 shrink-0" />
-              <span>
-                SMS sent with security PIN to <strong>{phone}</strong>. Please check your inbox.
-              </span>
-            </div>
-          )}
 
           {/* Error Message */}
           {error && (
@@ -296,15 +278,6 @@ const ResetPinPage: React.FC = () => {
               </button>
             </div>
           )}
-        </div>
-
-        {/* Brand footer */}
-        <div className="flex flex-col items-center pt-6 mb-[40px]">
-          <img 
-            src="/logo.png" 
-            alt="Vjay's Logo" 
-            className="w-10 h-10 object-contain select-none opacity-80" 
-          />
         </div>
       </div>
     </div>
